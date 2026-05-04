@@ -25,8 +25,8 @@ DEFAULT_DATA_DIR = str(HOME / "biomni_data")
 DEFAULT_TIMEOUT = 1200
 
 MODELS = [
-    "claude-sonnet-4-20250514",
-    "claude-opus-4-20250514",
+    "claude-sonnet-4-6",
+    "claude-opus-4-6",
     "claude-haiku-4-5-20251001",
     "gpt-4o",
     "gpt-4-turbo",
@@ -564,12 +564,16 @@ class CoScientist(tk.Tk):
                     text=True, encoding="utf-8", errors="replace",
                     env={**os.environ, "PYTHONUTF8": "1"},
                 )
+                _noise = ("WARNING", "scriptrunner", "ScriptRunContext",
+                          "session_state", "streamlit run [FILE", "run it with")
                 for line in proc.stdout:
                     if self._stop_flag.is_set():
                         proc.terminate()
                         self._append_output("\n[Stopped by user]\n")
                         log_file.write("\n[Stopped by user]\n")
                         break
+                    if any(n in line for n in _noise):
+                        continue
                     self._append_output(line)
                     log_file.write(line)
                     full_result.append(line)

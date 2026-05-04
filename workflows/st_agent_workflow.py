@@ -94,12 +94,8 @@ class StAgentWorkflow(BaseWorkflow):
         analysis_cb.grid(row=2, column=1, sticky="w", pady=(4, 0))
         analysis_cb.bind("<<ComboboxSelected>>", self._update_query)
 
-        # Row 3: run mode
-        ttk.Label(frame, text="Mode:").grid(row=3, column=0, sticky="w", padx=(0, 4), pady=(4, 0))
+        # Row 3: run mode (headless only)
         self.mode_var = tk.StringVar(value="Headless (in output panel)")
-        ttk.Combobox(frame, textvariable=self.mode_var,
-                     values=["Headless (in output panel)", "Launch Streamlit UI (browser)"],
-                     state="readonly", width=30).grid(row=3, column=1, sticky="w", pady=(4, 0))
 
         # Row 4: separator
         ttk.Separator(frame, orient="horizontal").grid(
@@ -140,58 +136,68 @@ class StAgentWorkflow(BaseWorkflow):
         return ""
 
     def get_run_script(self, model, data_dir, timeout, skip_datalake, full_prompt) -> str:
-        mode = self.mode_var.get() if self.mode_var else "Headless (in output panel)"
-        h5ad = self.h5ad_var.get().strip() if self.h5ad_var else ""
         st_src = str(ST_AGENT_SRC).replace("\\", "/")
-
-        if "Streamlit" in mode:
-            return f"""
-import subprocess, sys, webbrowser, time, os
-st_src = {repr(st_src)}
-env = {{**os.environ}}
-proc = subprocess.Popen(
-    [sys.executable, "-m", "streamlit", "run", "unified_app.py",
-     "--server.headless", "true", "--server.port", "8501"],
-    cwd=st_src, env=env
-)
-print("STAgent Streamlit UI starting at http://localhost:8501")
-time.sleep(3)
-webbrowser.open("http://localhost:8501")
-print("Browser opened. Close this panel when done.")
-proc.wait()
-"""
-        else:
-            return f"""
+        return f"""
 import sys, os
 from pathlib import Path
 from dotenv import load_dotenv
 
 st_src = {repr(st_src)}
+# Suppress Streamlit "missing ScriptRunContext" warnings before importing anything
+os.environ["STREAMLIT_LOGGER_LEVEL"] = "error"
+import logging
+logging.getLogger("streamlit").setLevel(logging.ERROR)
+import warnings
+warnings.filterwarnings("ignore")
 sys.path.insert(0, st_src)
 os.chdir(st_src)
 load_dotenv(Path(st_src) / ".env")
-# STAgent initializes all LLM providers at startup; set dummy key so Google SDK
-# doesn't raise DefaultCredentialsError when only Anthropic is used.
+# STAgent initializes all LLM providers at startup; set dummy keys so Google/OpenAI SDK
+# don't raise DefaultCredentialsError when only Anthropic is used.
 os.environ.setdefault("GOOGLE_API_KEY", "dummy")
 os.environ.setdefault("OPENAI_API_KEY", "dummy")
 
 from langchain_core.messages import HumanMessage
 from graph_unified import invoke_our_graph
 
-query = {repr(full_prompt)}
+# STAgent requires conversations to end with a user message (no prefill).
+# Map shorthand model IDs to dated versions compatible with STAgent.
+_model_map = {{
+    "claude-sonnet-4-6": "claude-sonnet-4-20250514",
+    "claude-opus-4-6":   "claude-opus-4-20250514",
+}}
+_model = _model_map.get({repr(model)}, {repr(model)})
+
+_headless = (
+    "This is a headless automated run — do NOT ask for confirmation or follow-up questions. "
+    "Execute the full requested analysis and deliver the complete result directly."
+)
+query = {repr(full_prompt)} + " " + _headless
 messages = [HumanMessage(content=query)]
 
 print("Running STAgent headless...")
 print("=" * 60)
 
-result = invoke_our_graph(messages, model_name={repr(model)})
+result = invoke_our_graph(messages, model_name=_model)
 
 print("\\n=== RESULT ===")
-last_msg = result.get("messages", [])
-if last_msg:
-    print(last_msg[-1].content)
-else:
-    print(result)
+messages = result.get("messages", [])
+
+def _extract_text(content):
+    if isinstance(content, list):
+        parts = [b["text"] for b in content if isinstance(b, dict) and b.get("type") == "text"]
+        return "\\n".join(parts)
+    return str(content) if content else ""
+
+# Walk backwards to find the last message with non-empty text
+output = ""
+for msg in reversed(messages):
+    text = _extract_text(msg.content)
+    if text.strip():
+        output = text
+        break
+
+print(output if output else "(no text output)")
 """
 
     def get_metadata(self) -> dict:
