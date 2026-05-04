@@ -160,12 +160,45 @@ os.environ.setdefault("OPENAI_API_KEY", "dummy")
 import matplotlib
 matplotlib.use("Agg")
 
-from langchain_core.messages import HumanMessage
-from graph_unified import invoke_our_graph
+from langchain_core.messages import HumanMessage, ToolMessage
+from graph_unified import invoke_our_graph, UnifiedLLMGraph
+
+# Reduce squidpy ligand-receptor permutations (default 500 → 50 for speed).
+# Patch after graph_unified import so tools.py has already imported squidpy.gr.
+import squidpy.gr as _sqgr
+import tools as _st_tools
+_orig_ligrec = _sqgr.ligrec
+def _patched_ligrec(*args, **kwargs):
+    kwargs.setdefault("n_perms", int(os.environ.get("STAGENT_N_PERMS", "50")))
+    return _orig_ligrec(*args, **kwargs)
+_sqgr.ligrec = _patched_ligrec
+if hasattr(_st_tools, "ligrec"):
+    _st_tools.ligrec = _patched_ligrec
+
+# Truncate tool output content to save tokens (option 3).
+# Long Python REPL outputs and metadata dumps get re-sent on every LLM call.
+_TOOL_OUTPUT_LIMIT = int(os.environ.get("STAGENT_TOOL_OUTPUT_LIMIT", "2000"))
+
+_orig_call_model = UnifiedLLMGraph._call_model
+
+def _patched_call_model(self, state, config):
+    # Truncate all tool message content in history before passing to LLM
+    for msg in state.get("messages", []):
+        if isinstance(msg, ToolMessage):
+            if isinstance(msg.content, str) and len(msg.content) > _TOOL_OUTPUT_LIMIT:
+                msg.content = msg.content[:_TOOL_OUTPUT_LIMIT] + "\\n...[truncated]"
+        # Skip vision: clear plot artifacts so images aren't base64-encoded
+        if os.environ.get("STAGENT_SKIP_VISION", "1") == "1":
+            if isinstance(msg, ToolMessage) and getattr(msg, "artifact", None):
+                msg.artifact = None
+    return _orig_call_model(self, state, config)
+
+UnifiedLLMGraph._call_model = _patched_call_model
 
 # STAgent requires conversations to end with a user message (no prefill).
 # Map shorthand model IDs to dated versions compatible with STAgent.
 _model_map = {{
+    "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
     "claude-sonnet-4-6": "claude-sonnet-4-20250514",
     "claude-opus-4-6":   "claude-opus-4-20250514",
 }}

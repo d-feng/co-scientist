@@ -18,6 +18,7 @@ load_dotenv()
 
 HOME = Path.home()
 LOG_DIR = HOME / "co_scientist_logs"
+RESULTS_DIR = Path(__file__).parent / "results"
 DATA_SOURCES_FILE = HOME / "co_scientist_data_sources.json"
 PROJECTS_FILE = HOME / "co_scientist_projects.json"
 WORKFLOW_BINS_FILE = HOME / "co_scientist_workflow_bins.json"
@@ -25,9 +26,9 @@ DEFAULT_DATA_DIR = str(HOME / "biomni_data")
 DEFAULT_TIMEOUT = 1200
 
 MODELS = [
+    "claude-haiku-4-5-20251001",
     "claude-sonnet-4-6",
     "claude-opus-4-6",
-    "claude-haiku-4-5-20251001",
     "gpt-4o",
     "gpt-4-turbo",
     "gemini-2.0-flash",
@@ -138,6 +139,10 @@ class CoScientist(tk.Tk):
         self.auto_memory_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(cfg, text="Auto-include memory",
                         variable=self.auto_memory_var).grid(row=1, column=3, sticky="w", pady=(4, 0))
+
+        self.skip_vision_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(cfg, text="Skip vision analysis",
+                        variable=self.skip_vision_var).grid(row=1, column=4, sticky="w", pady=(4, 0))
 
         # Row 2: per-workflow Python binary
         ttk.Label(cfg, text="Python:").grid(row=2, column=0, sticky="w", padx=(0, 4), pady=(4, 0))
@@ -568,6 +573,11 @@ class CoScientist(tk.Tk):
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         log_path = LOG_DIR / f"{wf.name.lower().replace('/', '_')}_{gene}_{timestamp}.txt"
 
+        # Per-project/per-run results folder
+        safe_preset = preset.lower().replace(" ", "_").replace("/", "_").replace("-", "_")
+        run_dir = RESULTS_DIR / project / f"{gene}_{safe_preset}_{timestamp}"
+        run_dir.mkdir(parents=True, exist_ok=True)
+
         script = wf.get_run_script(model, data_dir, timeout, skip_datalake, full_prompt)
 
         python_bin = wf.get_python_bin()
@@ -575,6 +585,7 @@ class CoScientist(tk.Tk):
             f"[{timestamp}] Workflow: {wf.name} | Project: {project}\n"
             f"Gene: {gene} | Preset: {preset} | Model: {model}\n"
             f"Python: {python_bin}\n"
+            f"Results: {run_dir}\n"
             f"Log: {log_path}\n{'='*60}\n"
         )
 
@@ -593,7 +604,9 @@ class CoScientist(tk.Tk):
                     [python_bin, "-c", script],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     text=True, encoding="utf-8", errors="replace",
-                    env={**os.environ, "PYTHONUTF8": "1"},
+                    env={**os.environ, "PYTHONUTF8": "1",
+                         "STAGENT_SKIP_VISION": "1" if self.skip_vision_var.get() else "0",
+                         "STAGENT_PLOT_DIR": str(run_dir)},
                 )
                 _noise = ("WARNING", "scriptrunner", "ScriptRunContext",
                           "session_state", "streamlit run [FILE", "run it with")
@@ -620,6 +633,11 @@ class CoScientist(tk.Tk):
 
         if completed:
             full_text = "".join(full_result)
+            # Save result text to run folder
+            try:
+                (run_dir / "result.txt").write_text(full_text, encoding="utf-8")
+            except Exception:
+                pass
             run_id = mem.save_pending(
                 project, wf.name, gene, preset, model, base_prompt, full_text, log_path)
             self.after(0, lambda: self._show_review_popup(project, run_id, full_text))
