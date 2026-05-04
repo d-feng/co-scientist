@@ -216,6 +216,37 @@ print("=" * 60)
 
 result = invoke_our_graph(messages, model_name=_model)
 
+# ── Post-run file organisation ────────────────────────────────────────────
+# Move files written by STAgent (in vendors/STAgent/src/results/) into the
+# per-run output folder.  H5AD files go to data/processed/<project>/ so the
+# dataset is preserved across runs; everything else (PNGs, CSVs, JSONs, TXTs)
+# goes into the per-run folder passed as STAGENT_PLOT_DIR.
+import shutil as _shutil
+
+_stagent_results = Path(st_src) / "results"
+_run_dir         = Path(os.environ.get("STAGENT_PLOT_DIR", str(_stagent_results)))
+_project         = os.environ.get("STAGENT_PROJECT", "Default")
+# co-scientist repo root is three levels above st_src (…/vendors/STAgent/src)
+_repo_root       = Path(st_src).parent.parent.parent
+_processed_dir   = _repo_root / "data" / "processed" / _project
+_processed_dir.mkdir(parents=True, exist_ok=True)
+_run_dir.mkdir(parents=True, exist_ok=True)
+
+if _stagent_results.exists() and _stagent_results.resolve() != _run_dir.resolve():
+    for _f in list(_stagent_results.iterdir()):
+        if not _f.is_file():
+            continue
+        _dest_dir = _processed_dir if _f.suffix.lower() == ".h5ad" else _run_dir
+        _dest = _dest_dir / _f.name
+        # Avoid overwriting — append counter suffix if needed
+        if _dest.exists():
+            _i = 1
+            while _dest.exists():
+                _dest = _dest_dir / f"{_f.stem}_{_i}{_f.suffix}"
+                _i += 1
+        _shutil.move(str(_f), str(_dest))
+        print(f"[files] {_f.name} -> {_dest.relative_to(_repo_root)}")
+
 print("\\n=== RESULT ===")
 messages = result.get("messages", [])
 
