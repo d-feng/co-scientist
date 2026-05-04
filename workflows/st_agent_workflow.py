@@ -156,6 +156,9 @@ load_dotenv(Path(st_src) / ".env")
 # don't raise DefaultCredentialsError when only Anthropic is used.
 os.environ.setdefault("GOOGLE_API_KEY", "dummy")
 os.environ.setdefault("OPENAI_API_KEY", "dummy")
+# Force non-interactive matplotlib backend so plots save to file instead of opening a window
+import matplotlib
+matplotlib.use("Agg")
 
 from langchain_core.messages import HumanMessage
 from graph_unified import invoke_our_graph

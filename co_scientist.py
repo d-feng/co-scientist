@@ -123,7 +123,8 @@ class CoScientist(tk.Tk):
         self.data_dir_var = tk.StringVar(value=DEFAULT_DATA_DIR)
         ttk.Entry(cfg, textvariable=self.data_dir_var, width=26).grid(
             row=0, column=5, sticky="w", padx=(0, 4))
-        ttk.Button(cfg, text="Browse…", command=self._browse_data_dir).grid(row=0, column=6)
+        ttk.Button(cfg, text="Dir…", command=self._browse_data_dir).grid(row=0, column=6, padx=(0, 2))
+        ttk.Button(cfg, text="File…", command=self._browse_data_file).grid(row=0, column=7)
 
         ttk.Label(cfg, text="Timeout (s):").grid(row=1, column=0, sticky="w", padx=(0, 4), pady=(4, 0))
         self.timeout_var = tk.IntVar(value=DEFAULT_TIMEOUT)
@@ -214,6 +215,7 @@ class CoScientist(tk.Tk):
 
         ds_btn = ttk.Frame(ds_frame)
         ds_btn.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(4, 0))
+        ttk.Button(ds_btn, text="Add File", command=self._add_file).pack(side="left", padx=2)
         ttk.Button(ds_btn, text="Add Path", command=self._add_path).pack(side="left", padx=2)
         ttk.Button(ds_btn, text="Add URL", command=self._add_url).pack(side="left", padx=2)
         ttk.Button(ds_btn, text="Remove", command=self._remove_ds).pack(side="left", padx=2)
@@ -319,13 +321,33 @@ class CoScientist(tk.Tk):
         sel = self.ds_tree.selection()
         if not sel:
             return
+        ds_type = self.ds_tree.item(sel[0], "values")[1]
         value = self.ds_tree.item(sel[0], "values")[2]
-        # Append to active workflow's prompt if it has one
         wf = self._active_workflow
+        # FILE entries: set the h5ad_var directly if the workflow has one
+        if ds_type == "FILE" and hasattr(wf, "h5ad_var") and wf.h5ad_var:
+            wf.h5ad_var.set(value)
+            return
+        # Otherwise append to prompt text
         if hasattr(wf, "prompt_text") and wf.prompt_text:
             wf.prompt_text.insert("end", f" {value}")
         elif hasattr(wf, "query_text") and wf.query_text:
             wf.query_text.insert("end", f" {value}")
+
+    def _add_file(self):
+        path = filedialog.askopenfilename(
+            title="Select file",
+            initialdir=str(Path(__file__).parent / "data"),
+            filetypes=[("H5AD files", "*.h5ad"), ("All files", "*.*")]
+        )
+        if not path:
+            return
+        name = simpledialog.askstring("Name", "Short name:", initialvalue=Path(path).name)
+        if not name:
+            return
+        self.data_sources.append({"name": name, "type": "FILE", "value": path})
+        save_data_sources(self.data_sources)
+        self._refresh_data_sources()
 
     def _add_path(self):
         path = filedialog.askdirectory(title="Select directory")
@@ -359,6 +381,15 @@ class CoScientist(tk.Tk):
 
     def _browse_data_dir(self):
         path = filedialog.askdirectory()
+        if path:
+            self.data_dir_var.set(path)
+
+    def _browse_data_file(self):
+        path = filedialog.askopenfilename(
+            title="Select data file",
+            initialdir=str(Path(__file__).parent / "data"),
+            filetypes=[("H5AD files", "*.h5ad"), ("All files", "*.*")]
+        )
         if path:
             self.data_dir_var.set(path)
 

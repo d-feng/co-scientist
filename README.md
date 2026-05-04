@@ -19,7 +19,15 @@ A multi-workflow agentic research platform. Run specialized biomedical AI workfl
 
 ## Setup
 
-### 1. Configure API key
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/d-feng/co-scientist.git
+cd co-scientist
+git submodule update --init --recursive
+```
+
+### 2. Configure API key
 
 Create a `.env` file in this folder:
 
@@ -28,17 +36,19 @@ ANTHROPIC_API_KEY=your_key_here
 NCBI_API_KEY=your_ncbi_key_here   # optional, raises GEO rate limit to 10 req/sec
 ```
 
-### 2. Create virtual environment
+### 3. Create virtual environment
 
 **Windows:**
 ```bat
 setup_venv.bat
 ```
 
-**Linux:**
+**Linux / Mac:**
 ```bash
 chmod +x setup_venv.sh && ./setup_venv.sh
 ```
+
+The Linux script auto-detects CUDA and installs the correct PyTorch version (CUDA 12.x, 11.x, or CPU). On Debian/Ubuntu it also installs `python3-venv` and `python3-tk` via `apt-get` if missing.
 
 ## How to Run
 
@@ -48,10 +58,46 @@ venv\Scripts\activate
 python co_scientist.py
 ```
 
-**Linux:**
+**Linux / Mac:**
 ```bash
 source venv/bin/activate
 python co_scientist.py
+```
+
+### Running on a headless Linux server
+
+The UI requires a display (tkinter). Options:
+
+**Option 1 — SSH with X forwarding:**
+```bash
+ssh -X user@your-server
+source venv/bin/activate
+python co_scientist.py
+```
+
+**Option 2 — Run analysis directly (no GUI):**
+```python
+# test_run.py
+import sys, os
+from pathlib import Path
+sys.path.insert(0, "vendors/STAgent/src")
+os.chdir("vendors/STAgent/src")
+os.environ.setdefault("GOOGLE_API_KEY", "dummy")
+os.environ.setdefault("OPENAI_API_KEY", "dummy")
+import matplotlib; matplotlib.use("Agg")
+from langchain_core.messages import HumanMessage
+from graph_unified import invoke_our_graph
+
+result = invoke_our_graph(
+    [HumanMessage(content="Load /path/to/data.h5ad and visualize spatial expression of IFNG.")],
+    model_name="claude-sonnet-4-20250514"
+)
+```
+
+**Option 3 — VNC / virtual display:**
+```bash
+Xvfb :99 -screen 0 1024x768x24 &
+DISPLAY=:99 python co_scientist.py
 ```
 
 ## UI Overview
@@ -93,7 +139,7 @@ Powered by [STAgent](https://github.com/LiuLab-Bioelectronics-Harvard/STAgent) (
 | H5AD file | Spatial transcriptomics dataset (`.h5ad`) |
 | Gene | Target gene symbol (default: IFNG) |
 | Analysis | Explore Metadata / QC / Spatial Expression / Cell Type Mapping / Cell-Cell Interaction / Full Report |
-| Mode | **Headless** (output in panel) or **Streamlit UI** (launches browser at `localhost:8501`) |
+| Mode | Headless — output streams to the panel |
 
 **Analysis types:**
 - **Explore Metadata** — summarize cells, spatial coords, gene stats
