@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Environment
+.env
+
+# Logs and runtime data
+co_scientist_logs/
+co_scientist_memory/
+
+# OS
+.DS_Store
+Thumbs.db

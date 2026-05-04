@@ -1,0 +1,3 @@
+[submodule "vendors/STAgent"]
+	path = vendors/STAgent
+	url = https://github.com/LiuLab-Bioelectronics-Harvard/STAgent
