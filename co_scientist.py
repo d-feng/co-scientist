@@ -601,7 +601,7 @@ class CoScientist(tk.Tk):
                     [python_bin, "-c", script],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     text=True, encoding="utf-8", errors="replace",
-                    env={**os.environ, "PYTHONUTF8": "1",
+                    env={**os.environ, "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1",
                          "STAGENT_SKIP_VISION": "1" if self.skip_vision_var.get() else "0",
                          "STAGENT_PLOT_DIR": str(run_dir),
                          "STAGENT_PROJECT": project},

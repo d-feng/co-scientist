@@ -183,6 +183,7 @@ _orig_call_model = UnifiedLLMGraph._call_model
 
 def _patched_call_model(self, state, config):
     # Truncate all tool message content in history before passing to LLM
+    n_msgs = len(state.get("messages", []))
     for msg in state.get("messages", []):
         if isinstance(msg, ToolMessage):
             if isinstance(msg.content, str) and len(msg.content) > _TOOL_OUTPUT_LIMIT:
@@ -191,6 +192,8 @@ def _patched_call_model(self, state, config):
         if os.environ.get("STAGENT_SKIP_VISION", "1") == "1":
             if isinstance(msg, ToolMessage) and getattr(msg, "artifact", None):
                 msg.artifact = None
+    import datetime as _dt
+    print(f"[{_dt.datetime.now().strftime('%H:%M:%S')}] LLM call ({n_msgs} messages in context)...")
     return _orig_call_model(self, state, config)
 
 UnifiedLLMGraph._call_model = _patched_call_model
