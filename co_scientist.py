@@ -17,7 +17,6 @@ from workflows import WORKFLOWS
 load_dotenv()
 
 HOME = Path.home()
-LOG_DIR = HOME / "co_scientist_logs"
 RESULTS_DIR = Path(__file__).parent / "results"
 DATA_SOURCES_FILE = HOME / "co_scientist_data_sources.json"
 PROJECTS_FILE = HOME / "co_scientist_projects.json"
@@ -570,13 +569,11 @@ class CoScientist(tk.Tk):
         skip_datalake = self.skip_datalake_var.get()
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        LOG_DIR.mkdir(parents=True, exist_ok=True)
-        log_path = LOG_DIR / f"{wf.name.lower().replace('/', '_')}_{gene}_{timestamp}.txt"
-
-        # Per-project/per-run results folder
+        # Per-project/per-run results folder — log lives here too
         safe_preset = preset.lower().replace(" ", "_").replace("/", "_").replace("-", "_")
         run_dir = RESULTS_DIR / project / f"{gene}_{safe_preset}_{timestamp}"
         run_dir.mkdir(parents=True, exist_ok=True)
+        log_path = run_dir / "run.log"
 
         script = wf.get_run_script(model, data_dir, timeout, skip_datalake, full_prompt)
 
