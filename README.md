@@ -13,7 +13,7 @@ A multi-workflow agentic research platform. Run specialized biomedical AI workfl
 ## Requirements
 
 - Python 3.11+
-- pip (all dependencies installed via pip — no conda required)
+- pip (no conda required)
 - NVIDIA GPU recommended (CPU-only also works)
 - Anthropic API key (or OpenAI / Gemini key)
 
@@ -27,13 +27,13 @@ cd co-scientist
 git submodule update --init --recursive
 ```
 
-### 2. Configure API key
+### 2. Configure API keys
 
-Create a `.env` file in this folder:
+Create a `.env` file in the repo root:
 
 ```
 ANTHROPIC_API_KEY=your_key_here
-NCBI_API_KEY=your_ncbi_key_here   # optional, raises GEO rate limit to 10 req/sec
+NCBI_API_KEY=your_ncbi_key_here   # optional — raises GEO rate limit to 10 req/sec
 ```
 
 ### 3. Create virtual environment
@@ -48,7 +48,14 @@ setup_venv.bat
 chmod +x setup_venv.sh && ./setup_venv.sh
 ```
 
-The Linux script auto-detects CUDA and installs the correct PyTorch version (CUDA 12.x, 11.x, or CPU). On Debian/Ubuntu it also installs `python3-venv` and `python3-tk` via `apt-get` if missing.
+The setup script:
+- Creates `venv/` in the repo root
+- Installs core dependencies (biomni, langgraph, chromadb)
+- Auto-detects CUDA and installs the matching PyTorch build (CUDA 12.x, 11.x, or CPU)
+- Installs the full STAgent spatial transcriptomics stack (squidpy, scanpy, anndata, spatialdata, etc.)
+- On Debian/Ubuntu: installs `python3-venv` and `python3-tk` via apt-get if missing
+
+> **Note:** `PIP_NO_BUILD_ISOLATION=1` is set automatically during install. This is required for `pims` (a squidpy dependency that uses a legacy `setup.py`).
 
 ## How to Run
 
@@ -66,7 +73,7 @@ python co_scientist.py
 
 ### Running on a headless Linux server
 
-The UI requires a display (tkinter). Options:
+The UI requires a display (tkinter). Three options:
 
 **Option 1 — SSH with X forwarding:**
 ```bash
@@ -75,16 +82,28 @@ source venv/bin/activate
 python co_scientist.py
 ```
 
-**Option 2 — Run analysis directly (no GUI):**
+**Option 2 — VNC / virtual display:**
+```bash
+Xvfb :99 -screen 0 1024x768x24 &
+DISPLAY=:99 source venv/bin/activate
+DISPLAY=:99 python co_scientist.py
+```
+
+**Option 3 — Run STAgent directly (no GUI):**
 ```python
-# test_run.py
+# headless_run.py — run from the repo root with the venv active
 import sys, os
 from pathlib import Path
-sys.path.insert(0, "vendors/STAgent/src")
-os.chdir("vendors/STAgent/src")
+from dotenv import load_dotenv
+
+st_src = str(Path("vendors/STAgent/src").resolve())
+sys.path.insert(0, st_src)
+os.chdir(st_src)
+load_dotenv(Path(st_src) / ".env")
 os.environ.setdefault("GOOGLE_API_KEY", "dummy")
 os.environ.setdefault("OPENAI_API_KEY", "dummy")
 import matplotlib; matplotlib.use("Agg")
+
 from langchain_core.messages import HumanMessage
 from graph_unified import invoke_our_graph
 
@@ -92,30 +111,37 @@ result = invoke_our_graph(
     [HumanMessage(content="Load /path/to/data.h5ad and visualize spatial expression of IFNG.")],
     model_name="claude-sonnet-4-20250514"
 )
-```
-
-**Option 3 — VNC / virtual display:**
-```bash
-Xvfb :99 -screen 0 1024x768x24 &
-DISPLAY=:99 python co_scientist.py
+messages = result.get("messages", [])
+print(messages[-1].content if messages else "(no output)")
 ```
 
 ## UI Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Configuration: Project | Model | Data dir | Timeout | Flags │
-├──────────┬──────────────────────────┬───────────────────────┤
-│Workflows │  Workflow Input Panel    │  Data Sources         │
-│          │  (changes per workflow)  ├───────────────────────┤
-│ Biomni   │                          │  Memory               │
-│ GEO/SRA  │                          │  (semantic search)    │
-├──────────┴──────────────────────────┴───────────────────────┤
-│  Output (live streaming terminal)                           │
-├─────────────────────────────────────────────────────────────┤
-│  ▶ Start | ■ Stop | Clear | Results Manager       [status]  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  Project | Model | Python | Data dir | Timeout | Skip vision    │
+├──────────┬────────────────────────────┬─────────────────────────┤
+│Workflows │  Workflow Input Panel      │  Data Sources           │
+│          │  (changes per workflow)    ├─────────────────────────┤
+│ Biomni   │                            │  Memory                 │
+│ GEO/SRA  │                            │  (semantic search)      │
+│ ST Agent │                            │                         │
+├──────────┴────────────────────────────┴─────────────────────────┤
+│  Output (live streaming terminal)                               │
+├─────────────────────────────────────────────────────────────────┤
+│  ▶ Start | ■ Stop | Clear | Results Manager          [status]   │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+**Configuration row:**
+| Field | Description |
+|-------|-------------|
+| Project | Isolates memory and results by project name |
+| Model | LLM to use — defaults to Haiku (cheapest); Sonnet for complex analyses |
+| Python | Path to Python interpreter for the active workflow — leave blank to use the current venv |
+| Data dir | Default data directory passed to Biomni / GEO workflows |
+| Timeout | Max seconds per run (default 1200) |
+| Skip vision | Prevents STAgent from re-sending plot images to the LLM (saves 30–50% tokens) |
 
 ## Memory System
 
@@ -123,33 +149,70 @@ Each project has isolated semantic memory (ChromaDB, `all-MiniLM-L6-v2`).
 
 **Flow per run:**
 1. Click **▶ Start** → auto-searches current project for relevant past results
-2. Top 3 matches shown in Memory panel (pre-checked)
-3. Checked results injected into prompt as context
+2. Top matches shown in the Memory panel (pre-checked)
+3. Checked results injected into the prompt as context
 4. After completion → **Results Review** popup: **Keep** or **Delete**
-5. Kept results used in all future runs for that project
+5. Kept results are used in all future runs for that project
 
-Toggle **"Auto-include memory"** to disable injection without clearing results.
+Toggle **"Auto-include memory"** to disable injection without clearing stored results.
+
+## Results
+
+Every run creates a self-contained folder:
+
+```
+results/
+└── {project}/
+    └── {gene}_{analysis}_{timestamp}/
+        ├── run.log       — full streaming output
+        ├── result.txt    — final LLM answer
+        ├── *.png         — plots generated by STAgent
+        ├── *.csv         — tabular outputs
+        └── *.json        — structured results
+```
+
+H5AD files written by STAgent are moved to `data/processed/{project}/` and shared across runs (not duplicated per run).
 
 ## ST Agent Workflow
 
 Powered by [STAgent](https://github.com/LiuLab-Bioelectronics-Harvard/STAgent) (Harvard Liu Lab).
 
-| Input | Description |
+**Input fields:**
+
+| Field | Description |
 |-------|-------------|
-| H5AD file | Spatial transcriptomics dataset (`.h5ad`) |
+| H5AD file | Spatial transcriptomics dataset — browse or select from Data Sources |
 | Gene | Target gene symbol (default: IFNG) |
-| Analysis | Explore Metadata / QC / Spatial Expression / Cell Type Mapping / Cell-Cell Interaction / Full Report |
-| Mode | Headless — output streams to the panel |
+| Analysis | Select from the analysis types below |
+| Query | Auto-generated prompt — editable before running |
 
 **Analysis types:**
-- **Explore Metadata** — summarize cells, spatial coords, gene stats
-- **Quality Control** — QC metrics per spot, spatial distribution
-- **Spatial Gene Expression** — expression map, co-expressed genes, tissue context
-- **Cell Type Mapping** — annotation, spatial map, UMAP
-- **Cell-Cell Interaction** — ligand-receptor analysis, interaction network
-- **Full Analysis Report** — complete pipeline + literature synthesis
+
+| Type | What it does |
+|------|-------------|
+| Explore Metadata | Summarize spots, spatial coordinates, cell type annotations, gene stats |
+| Quality Control | QC metrics per spot, mitochondrial fraction, spatial distribution |
+| Spatial Gene Expression | Expression map, high-expression regions, co-expressed genes |
+| Cell Type Mapping | Cell type annotation, spatial map, UMAP colored by cell type and gene |
+| Cell-Cell Interaction | Ligand-receptor analysis (squidpy), top interacting cell type pairs |
+| Full Analysis Report | Complete pipeline: QC → annotation → spatial expression → interactions → literature |
+
+**Cost-saving options (enabled by default):**
+- **Skip vision** — disables image re-encoding in LLM context (saves ~30–50% tokens)
+- Squidpy ligand-receptor permutations reduced 500 → 50 (controllable via `STAGENT_N_PERMS`)
+- Tool output truncated to 2000 chars per message (controllable via `STAGENT_TOOL_OUTPUT_LIMIT`)
+- Default model is Haiku — switch to Sonnet for higher accuracy
 
 **Sample data:** Available from the [STAgent repo](https://github.com/LiuLab-Bioelectronics-Harvard/STAgent) Google Drive link — place `.h5ad` files in `./data/`.
+
+**Estimated cost per run (Haiku):**
+
+| Analysis | Approx. cost |
+|----------|-------------|
+| Explore Metadata | ~$0.01 |
+| Cell Type Mapping | ~$0.05–0.10 |
+| Cell-Cell Interaction | ~$0.10–0.20 |
+| Full Analysis Report | ~$0.30–0.60 |
 
 ## GEO/SRA Workflow
 
@@ -162,34 +225,17 @@ Powered by [STAgent](https://github.com/LiuLab-Bioelectronics-Harvard/STAgent) (
 | Analysis | Search & Discover / Download & Extract / DEG Analysis / Full Pipeline |
 | DEG method | DESeq2 (default), edgeR, limma-voom, pyDESeq2 |
 
-## GEO/SRA Test Results (2026-05-03)
-
-Tested **Search & Discover** for IFNG in Homo sapiens (past 5 years, ≥10 samples).
-Found 14 qualifying studies. Top 10 ranked by sample size:
-
-| Accession | Samples | Title | Date |
-|-----------|---------|-------|------|
-| GSE313775 | 66 | Circulating Th1/Th17 cells in endometriosis | 2025-12 |
-| GSE255517 | 57 | CRISPR screen of tumor microenvironment modulators | 2026-01 |
-| GSE318083 | 43 | BAF complexes and stimulus-responsive chromatin | 2026-04 |
-| GSE302854 | 40 | PBMCs transcriptome in pulmonary sarcoidosis | 2025-12 |
-| GSE324594 | 36 | IFN-γ transcriptional changes in keratinocytes | 2026-03 |
-| GSE255658 | 30 | IFN-γ in PILRA knockout iPSC-derived microglia | 2025-11 |
-| GSE322659 | 24 | NOS2 in metastatic triple-negative breast cancer | 2026-03 |
-| GSE294918 | 20 | IFN-γ-induced memory in human macrophages | 2025-12 |
-| GSE261696 | 19 | Transcriptional profiling of human monocytes/macrophages | 2026-01 |
-| GSE264636 | 15 | Single-cell profiling of cutaneous T-cell lymphomas | 2026-04 |
-
-Recommended next step: run **DEG Analysis** on GSE294918 (IFN-γ macrophage memory, 20 samples, well-powered).
-
 ## File Locations
 
-| File | Path |
-|------|------|
-| Run logs | `~/co_scientist_logs/` |
-| Memory database | `~/co_scientist_memory/` |
-| Data sources | `~/co_scientist_data_sources.json` |
-| Projects list | `~/co_scientist_projects.json` |
+| Path | Contents |
+|------|----------|
+| `results/{project}/{gene}_{analysis}_{timestamp}/` | Per-run outputs: plots, CSVs, result text, log |
+| `data/processed/{project}/` | Processed H5AD files (shared across runs) |
+| `data/` | Raw input data (place `.h5ad` files here) |
+| `~/co_scientist_memory/` | ChromaDB semantic memory database |
+| `~/co_scientist_data_sources.json` | Saved data source entries |
+| `~/co_scientist_projects.json` | Project list |
+| `~/co_scientist_workflow_bins.json` | Per-workflow Python interpreter paths |
 
 ## Adding New Workflows
 
@@ -209,8 +255,8 @@ class MyWorkflow(BaseWorkflow):
     def get_metadata(self) -> dict: ...
 ```
 
-Then add it to `workflows/__init__.py`:
+Then register it in `workflows/__init__.py`:
 ```python
 from .my_workflow import MyWorkflow
-WORKFLOWS = [BiomniWorkflow(), GeoSraWorkflow(), MyWorkflow()]
+WORKFLOWS = [BiomniWorkflow(), GeoSraWorkflow(), StAgentWorkflow(), MyWorkflow()]
 ```
