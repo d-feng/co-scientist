@@ -139,7 +139,7 @@ os.chdir(agent_src)
 import types as _types
 
 class _Stub:
-    """Catches any attribute access and returns a no-op callable."""
+    # Catches any attribute access and returns a no-op callable
     def __getattr__(self, name):
         return _Stub()
     def __call__(self, *a, **kw):
