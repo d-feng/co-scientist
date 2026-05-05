@@ -3,4 +3,4 @@
 	url = https://github.com/LiuLab-Bioelectronics-Harvard/STAgent
 [submodule "vendors/cellatria"]
 	path = vendors/cellatria
-	url = https://github.com/AstraZeneca/cellatria.git
+	url = https://github.com/d-feng/cellatria.git
