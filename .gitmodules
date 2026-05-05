@@ -1,3 +1,6 @@
 [submodule "vendors/STAgent"]
 	path = vendors/STAgent
 	url = https://github.com/LiuLab-Bioelectronics-Harvard/STAgent
+[submodule "vendors/cellatria"]
+	path = vendors/cellatria
+	url = https://github.com/AstraZeneca/cellatria.git
