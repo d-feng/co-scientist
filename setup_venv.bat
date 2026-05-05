@@ -39,7 +39,12 @@ copy vendors\STAgent\src\.env.example vendors\STAgent\src\.env 2>nul
 
 echo.
 echo [7/7] Installing CellAtria + CellExpress dependencies...
+rem Core scientific stack
+pip install numpy pandas scipy h5py anndata scanpy tqdm scikit-learn networkx annoy
+rem CellAtria agent dependencies
 pip install gradio GEOparse beautifulsoup4 pymupdf psutil
+pip install langchain langchain-core langchain-community langchain-anthropic langchain-openai langgraph
+rem CellExpress annotation + QC tools
 pip install celltypist scrublet "harmonypy==0.0.9" scimilarity
 rem Restore zarr>=3 (scimilarity may downgrade it)
 pip install "zarr>=3.0" --upgrade
