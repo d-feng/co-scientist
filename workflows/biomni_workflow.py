@@ -96,11 +96,12 @@ from biomni.config import default_config
 
 default_config.timeout_seconds = {timeout}
 
-# Use per-run folder as Biomni working path so outputs land in the right place.
-# Falls back to data_dir if the env var isn't set.
-_run_dir = os.environ.get("COSCIENTIST_RUN_DIR", {repr(data_dir)})
+# Biomni data dir: shared across runs so data lake is downloaded only once.
+# Per-run results folder is separate (used for log/result.txt by co-scientist).
+_data_dir = {repr(data_dir)}
+Path(_data_dir).mkdir(parents=True, exist_ok=True)
 
-kwargs = dict(path=_run_dir, llm={repr(model)})
+kwargs = dict(path=_data_dir, llm={repr(model)})
 if {repr(skip_datalake)}:
     kwargs['expected_data_lake_files'] = []
 

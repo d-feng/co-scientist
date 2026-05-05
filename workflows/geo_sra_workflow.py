@@ -169,8 +169,9 @@ from biomni.config import default_config
 
 default_config.timeout_seconds = {timeout}
 
-_run_dir = os.environ.get("COSCIENTIST_RUN_DIR", {repr(data_dir)})
-kwargs = dict(path=_run_dir, llm={repr(model)})
+_data_dir = {repr(data_dir)}
+Path(_data_dir).mkdir(parents=True, exist_ok=True)
+kwargs = dict(path=_data_dir, llm={repr(model)})
 if {repr(skip_datalake)}:
     kwargs['expected_data_lake_files'] = []
 
