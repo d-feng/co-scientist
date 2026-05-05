@@ -279,6 +279,50 @@ Powered by [CellAtria](https://github.com/AstraZeneca/cellatria) (AstraZeneca) �
 | `~/co_scientist_projects.json` | Project list |
 | `~/co_scientist_workflow_bins.json` | Per-workflow Python interpreter paths |
 
+## CLI (no GUI required)
+
+Run any workflow directly from the terminal — no tkinter, no display needed.
+
+```bash
+source venv/bin/activate   # Linux/Mac
+# venv\Scripts\activate    # Windows
+
+# List workflows
+python cli.py list
+
+# CellAtria — full scRNA-seq pipeline
+python cli.py cellatria GSE284775 --analysis "Full Pipeline" --gene IFNG
+
+# CellAtria — metadata extraction from URL
+python cli.py cellatria https://doi.org/... --analysis "Metadata Extraction (URL)"
+
+# ST Agent — spatial gene expression
+python cli.py st-agent data/sample.h5ad --gene IFNG --analysis "Spatial Gene Expression"
+
+# ST Agent — full report
+python cli.py st-agent data/sample.h5ad --gene IFNG --analysis "Full Analysis Report" --model claude-sonnet-4-6
+
+# Biomni — free-form query
+python cli.py biomni "Characterize the role of IFNG in tumor immune evasion."
+
+# GEO/SRA — download and DEG analysis
+python cli.py geo "Download GSE96058 and run DESeq2 DEG analysis for IFNG."
+
+# Any workflow with a custom prompt
+python cli.py run --workflow CellAtria --prompt "Convert BD Rhapsody files in data/GSM123 to h5ad."
+```
+
+**Global options** (all subcommands):
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--model` | haiku | Claude model ID |
+| `--project` | cli | Project name for results isolation |
+| `--timeout` | 1200 | Max run time in seconds |
+| `--no-live` | — | Suppress real-time output streaming |
+
+Results are saved to `results/{project}/` — same structure as the GUI and notebook.
+
 ## Jupyter Notebook
 
 All workflows can be run headlessly from `co_scientist.ipynb` — no tkinter / GUI required.
