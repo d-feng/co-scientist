@@ -134,6 +134,27 @@ agent_src = {repr(agent_src)}
 sys.path.insert(0, agent_src)
 os.chdir(agent_src)
 
+# Stub out gradio before any cellatria import so no server is launched.
+# utils.py does `import gradio as gr` at module level and accesses gr.themes.
+import types as _types
+
+class _Stub:
+    """Catches any attribute access and returns a no-op callable."""
+    def __getattr__(self, name):
+        return _Stub()
+    def __call__(self, *a, **kw):
+        return _Stub()
+    def __iter__(self):
+        return iter([])
+
+_gr_stub = _types.ModuleType("gradio")
+_gr_stub.themes = _Stub()
+for _k in ["Blocks","Row","Column","Chatbot","Textbox","Button",
+           "File","Image","HTML","Markdown","Tab","Tabs",
+           "update","Warning","Info","Error","CSS"]:
+    setattr(_gr_stub, _k, _Stub())
+sys.modules.setdefault("gradio", _gr_stub)
+
 # Load repo .env for ANTHROPIC_API_KEY, then write a cellatria .env
 load_dotenv(Path(agent_src).parent.parent.parent / ".env")
 
