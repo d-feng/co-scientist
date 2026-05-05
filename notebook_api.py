@@ -42,16 +42,19 @@ def list_workflows():
     print(f"{'Workflow':<14} {'Description'}")
     print("-" * 70)
     for wf in WORKFLOWS:
-        print(f"{wf.icon} {wf.name:<12} {wf.description}")
+        icon = wf.icon.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(sys.stdout.encoding or "utf-8", errors="replace")
+        print(f"{icon} {wf.name:<12} {wf.description}")
 
 
 def _stream(proc, log_path: Path, live: bool) -> str:
     """Stream subprocess stdout, write to log, return full output."""
     lines = []
+    _enc = sys.stdout.encoding or "utf-8"
     with open(log_path, "w", encoding="utf-8") as log_file:
         for line in proc.stdout:
             if live:
-                print(line, end="", flush=True)
+                safe = line.encode(_enc, errors="replace").decode(_enc, errors="replace")
+                print(safe, end="", flush=True)
             log_file.write(line)
             lines.append(line)
     proc.wait()
@@ -156,8 +159,8 @@ def run_workflow(
 
     success = proc.returncode == 0
     if live_output:
-        status = "✓ Completed" if success else f"✗ Failed (exit {proc.returncode})"
-        print(f"\n{status} — results in {run_dir}")
+        status = "Completed" if success else f"Failed (exit {proc.returncode})"
+        print(f"\n{status} - results in {run_dir}")
 
     return {
         "success": success,
