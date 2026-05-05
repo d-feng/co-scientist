@@ -33,20 +33,14 @@ echo.
 echo [6/6] Installing STAgent + spatial transcriptomics dependencies (pip)...
 rem pims (pulled by squidpy) uses legacy setup.py -- disable build isolation
 set PIP_NO_BUILD_ISOLATION=1
-pip install -r vendors\STAgent\requirements-pip.txt
+pip install -r "%~dp0vendors\STAgent\requirements-pip.txt"
 set PIP_NO_BUILD_ISOLATION=
-copy vendors\STAgent\src\.env.example vendors\STAgent\src\.env 2>nul
+copy "%~dp0vendors\STAgent\src\.env.example" "%~dp0vendors\STAgent\src\.env" 2>nul
 
 echo.
 echo [7/7] Installing CellAtria + CellExpress dependencies...
-rem Core scientific stack
-pip install numpy pandas scipy h5py anndata scanpy tqdm scikit-learn networkx annoy
-rem CellAtria agent dependencies
-pip install gradio GEOparse beautifulsoup4 pymupdf psutil
-pip install langchain langchain-core langchain-community langchain-anthropic langchain-openai langgraph
-rem CellExpress annotation + QC tools
-pip install celltypist scrublet "harmonypy==0.0.9" scimilarity
-rem Restore zarr>=3 (scimilarity may downgrade it)
+pip install -r "%~dp0vendors\cellatria\agent\requirements-pip.txt"
+rem Restore zarr>=3 last (scimilarity may downgrade it during the above install)
 pip install "zarr>=3.0" --upgrade
 
 echo.
