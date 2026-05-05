@@ -9,6 +9,7 @@ A multi-workflow agentic research platform. Run specialized biomedical AI workfl
 | **Biomni** | General-purpose biomedical AI agent (Stanford SNAP) — protein expression, DEG, target characterization, scRNA-seq |
 | **GEO/SRA** | Search, download, and analyze NCBI GEO/SRA datasets — DESeq2, edgeR, limma-voom, pathway enrichment |
 | **ST Agent** | Spatial transcriptomics analysis — Harvard Liu Lab STAgent (h5ad → cell type mapping, spatial gene expression, cell-cell interaction, full report) |
+| **CellAtria** | Single-cell RNA-seq agent — AstraZeneca [CellAtria](https://github.com/AstraZeneca/cellatria) (GEO metadata extraction, dataset retrieval, QC → clustering → cell type annotation via CellExpress) |
 
 ## Requirements
 
@@ -53,6 +54,7 @@ The setup script:
 - Installs core dependencies (biomni, langgraph, chromadb)
 - Auto-detects CUDA and installs the matching PyTorch build (CUDA 12.x, 11.x, or CPU)
 - Installs the full STAgent spatial transcriptomics stack (squidpy, scanpy, anndata, spatialdata, etc.)
+- Installs CellAtria / CellExpress dependencies (gradio, GEOparse, celltypist, scrublet, harmonypy, scimilarity, zarr)
 - On Debian/Ubuntu: installs `python3-venv` and `python3-tk` via apt-get if missing
 
 > **Note:** `PIP_NO_BUILD_ISOLATION=1` is set automatically during install. This is required for `pims` (a squidpy dependency that uses a legacy `setup.py`).
@@ -126,6 +128,7 @@ print(messages[-1].content if messages else "(no output)")
 │ Biomni   │                            │  Memory                 │
 │ GEO/SRA  │                            │  (semantic search)      │
 │ ST Agent │                            │                         │
+│ CellAtria│                            │                         │
 ├──────────┴────────────────────────────┴─────────────────────────┤
 │  Output (live streaming terminal)                               │
 ├─────────────────────────────────────────────────────────────────┤
@@ -213,6 +216,45 @@ Powered by [STAgent](https://github.com/LiuLab-Bioelectronics-Harvard/STAgent) (
 | Cell Type Mapping | ~$0.05–0.10 |
 | Cell-Cell Interaction | ~$0.10–0.20 |
 | Full Analysis Report | ~$0.30–0.60 |
+
+## CellAtria Workflow
+
+Powered by [CellAtria](https://github.com/AstraZeneca/cellatria) (AstraZeneca) — a LangGraph-based scRNA-seq agent with 33 tools.
+
+**Input fields:**
+
+| Field | Description |
+|-------|-------------|
+| Analysis | Preset analysis type (see below) |
+| Input | URL, GEO accession (e.g. GSE284775), or path to a PDF |
+| Gene | Target gene symbol (default: IFNG) |
+| Query | Auto-generated prompt — editable before running |
+
+**Analysis types:**
+
+| Type | What it does |
+|------|-------------|
+| Metadata Extraction (URL) | Extract scRNA-seq metadata (organism, tissue, cell types, GEO IDs) from an article URL |
+| Metadata Extraction (PDF) | Same extraction from an uploaded PDF |
+| GEO Dataset Retrieval | Fetch GEO metadata, list files, download raw count matrix |
+| Full Pipeline | End-to-end: fetch → download → QC → normalize → cluster → annotate cell types |
+| Custom Query | Free-form prompt — full access to all 33 CellAtria tools |
+
+**Supported input formats:**
+
+| Format | Notes |
+|--------|-------|
+| 10X Genomics (MTX) | `matrix.mtx.gz`, `features.tsv.gz`, `barcodes.tsv.gz` — native CellExpress input |
+| H5 / H5AD | Direct CellExpress input |
+| BD Rhapsody | `*_DBEC_MolsPerCell.csv.gz` or `*_ReadsPerCell.csv.gz` — auto-converted to H5AD |
+
+**Estimated cost per run (Sonnet):**
+
+| Analysis | Approx. cost |
+|----------|-------------|
+| Metadata Extraction | ~$0.02–0.05 |
+| GEO Dataset Retrieval | ~$0.05–0.10 |
+| Full Pipeline | ~$0.20–0.50 |
 
 ## GEO/SRA Workflow
 
