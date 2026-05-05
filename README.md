@@ -45,6 +45,9 @@ GOOGLE_API_KEY=your_key_here
 # Optional — raises GEO/NCBI rate limit to 10 req/sec
 NCBI_API_KEY=your_ncbi_key_here
 
+# Optional — shared data directory for Biomni/GEO data lake (default: ~/biomni_data)
+COSCIENTIST_DATA_DIR=/path/to/shared/data
+
 # Optional — override API endpoint (LiteLLM / Ollama gateway)
 ANTHROPIC_BASE_URL=http://localhost:4000
 ```

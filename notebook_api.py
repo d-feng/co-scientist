@@ -117,7 +117,7 @@ def run_workflow(
         raise ValueError(f"Unknown workflow '{workflow_name}'. Available: {names}")
 
     if data_dir is None:
-        data_dir = str(REPO_ROOT / "data")
+        data_dir = os.environ.get("COSCIENTIST_DATA_DIR", str(Path.home() / "biomni_data"))
 
     # Per-run output folder
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")

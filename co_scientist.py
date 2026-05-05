@@ -21,7 +21,7 @@ RESULTS_DIR = Path(__file__).parent / "results"
 DATA_SOURCES_FILE = HOME / "co_scientist_data_sources.json"
 PROJECTS_FILE = HOME / "co_scientist_projects.json"
 WORKFLOW_BINS_FILE = HOME / "co_scientist_workflow_bins.json"
-DEFAULT_DATA_DIR = str(HOME / "biomni_data")
+DEFAULT_DATA_DIR = os.environ.get("COSCIENTIST_DATA_DIR", str(HOME / "biomni_data"))
 DEFAULT_TIMEOUT = 1200
 
 MODELS = [
