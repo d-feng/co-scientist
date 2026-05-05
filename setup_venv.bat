@@ -33,7 +33,7 @@ echo.
 echo [6/6] Installing STAgent + spatial transcriptomics dependencies (pip)...
 rem pims (pulled by squidpy) uses legacy setup.py -- disable build isolation
 set PIP_NO_BUILD_ISOLATION=1
-pip install -r "%~dp0vendors\STAgent\requirements-pip.txt"
+pip install -r "%~dp0requirements-stagent.txt"
 set PIP_NO_BUILD_ISOLATION=
 copy "%~dp0vendors\STAgent\src\.env.example" "%~dp0vendors\STAgent\src\.env" 2>nul
 

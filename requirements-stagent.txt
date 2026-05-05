@@ -1,0 +1,53 @@
+# ST Agent — pip requirements (replaces environment.yml for non-conda setups)
+# Generated from environment.yml + compatibility fixes discovered during testing.
+
+# ── LangChain / LangGraph ─────────────────────────────────────────────────────
+langchain>=0.3.11
+langchain-core>=0.3.24
+langchain-community>=0.3.11
+langchain-openai>=0.3.7
+langchain-anthropic>=0.3.15
+langchain-google-genai>=2.1.5
+langchain-chroma>=0.2.0
+langchain-text-splitters>=0.3.6
+langgraph>=0.5.4
+
+# ── LLM providers ─────────────────────────────────────────────────────────────
+openai>=1.61.0
+google-generativeai>=0.8.3
+
+# ── Search ────────────────────────────────────────────────────────────────────
+google-search-results>=2.4.2
+serpapi>=1.0.0
+
+# ── Streamlit ─────────────────────────────────────────────────────────────────
+streamlit>=1.41.1
+# audio-recorder-streamlit  # optional — only needed for Streamlit UI voice input
+# streamlit-audiorec         # optional — only needed for Streamlit UI voice input
+
+# ── Spatial transcriptomics stack ────────────────────────────────────────────
+# zarr>=3.0 required for anndata>=0.11; spatialdata requires zarr>=3
+zarr>=3.0
+anndata>=0.11
+xarray>=2024.10
+# dask pinned: squidpy requires <=2024.11.2, spatialdata requires >=2024.4.1
+dask[array]>=2024.4.1,<=2024.11.2
+# pims (pulled by squidpy) uses legacy setup.py — install with PIP_NO_BUILD_ISOLATION=1
+scanpy>=1.11,<1.12
+squidpy>=1.6,<1.7
+spatialdata>=0.7.1
+h5py>=3.10          # 3.10+ compiled for NumPy 2.x
+
+# ── Graph / clustering ────────────────────────────────────────────────────────
+igraph>=0.11
+leidenalg>=0.10
+louvain>=0.8
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.1
+GitPython>=3.1
+aiohttp>=3.10
+requests>=2.32
+httpx>=0.28
+tenacity>=9.0
+filetype>=1.2

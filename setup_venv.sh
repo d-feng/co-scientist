@@ -52,7 +52,7 @@ pip install "pyarrow>=14.0" --upgrade
 
 echo && echo "[6/7] Installing STAgent + spatial transcriptomics dependencies..."
 # pims (pulled by squidpy) uses legacy setup.py — disable build isolation
-PIP_NO_BUILD_ISOLATION=1 pip install -r "$SCRIPT_DIR/vendors/STAgent/requirements-pip.txt"
+PIP_NO_BUILD_ISOLATION=1 pip install -r "$SCRIPT_DIR/requirements-stagent.txt"
 cp "$SCRIPT_DIR/vendors/STAgent/src/.env.example" "$SCRIPT_DIR/vendors/STAgent/src/.env" 2>/dev/null || true
 
 echo && echo "[7/7] Installing CellAtria + CellExpress dependencies..."
