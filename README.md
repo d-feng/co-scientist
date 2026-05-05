@@ -327,43 +327,120 @@ Powered by [CellAtria](https://github.com/AstraZeneca/cellatria) (AstraZeneca) �
 
 Run any workflow directly from the terminal — no tkinter, no display needed.
 
+**Activate the venv first:**
 ```bash
-source venv/bin/activate   # Linux/Mac
-# venv\Scripts\activate    # Windows
+# Linux / Mac
+source venv/bin/activate
 
-# List workflows
+# Windows (Command Prompt)
+venv\Scripts\activate
+
+# Windows — if Anaconda is default Python, use explicit path instead:
+# venv\Scripts\python.exe cli.py <subcommand> ...
+```
+
+---
+
+### List workflows
+```bash
 python cli.py list
+```
 
-# CellAtria — full scRNA-seq pipeline
-python cli.py cellatria GSE284775 --analysis "Full Pipeline" --gene IFNG
+---
 
-# CellAtria — metadata extraction from URL
-python cli.py cellatria https://doi.org/... --analysis "Metadata Extraction (URL)"
+### CellAtria — Single-cell RNA-seq
 
-# ST Agent — spatial gene expression
+```bash
+# Fetch GEO metadata and list available files
+python cli.py cellatria GSE284775 --analysis "GEO Dataset Retrieval" --gene IFNG
+
+# Full pipeline: download → QC → cluster → annotate cell types
+python cli.py cellatria GSE284775 --analysis "Full Pipeline" --gene IFNG --model claude-sonnet-4-6
+
+# Extract metadata from an article URL
+python cli.py cellatria https://doi.org/10.1038/s41467-021-27729-z --analysis "Metadata Extraction (URL)"
+
+# Extract metadata from a PDF
+python cli.py cellatria /path/to/paper.pdf --analysis "Metadata Extraction (PDF)"
+
+# Custom free-form query
+python cli.py cellatria "convert BD Rhapsody files in data/GSM123 to h5ad then run CellExpress" \
+    --analysis "Custom Query" --project my_project
+```
+
+---
+
+### ST Agent — Spatial Transcriptomics
+
+```bash
+# Spatial gene expression map
 python cli.py st-agent data/sample.h5ad --gene IFNG --analysis "Spatial Gene Expression"
 
-# ST Agent — full report
-python cli.py st-agent data/sample.h5ad --gene IFNG --analysis "Full Analysis Report" --model claude-sonnet-4-6
+# Cell type annotation + UMAP
+python cli.py st-agent data/sample.h5ad --gene IFNG --analysis "Cell Type Mapping"
 
-# Biomni — free-form query
-python cli.py biomni "Characterize the role of IFNG in tumor immune evasion."
+# Full analysis report (QC → annotation → spatial → interactions → literature)
+python cli.py st-agent data/sample.h5ad --gene IFNG --analysis "Full Analysis Report" \
+    --model claude-sonnet-4-6 --timeout 1800
 
-# GEO/SRA — download and DEG analysis
-python cli.py geo "Download GSE96058 and run DESeq2 DEG analysis for IFNG."
-
-# Any workflow with a custom prompt
-python cli.py run --workflow CellAtria --prompt "Convert BD Rhapsody files in data/GSM123 to h5ad."
+# Enable vision (higher token cost but better plot understanding)
+python cli.py st-agent data/sample.h5ad --gene IFNG --vision
 ```
+
+---
+
+### Biomni — General Biomedical Agent
+
+```bash
+# Literature characterization
+python cli.py biomni "Characterize the role of IFNG in tumor immune evasion." \
+    --project biomni_research
+
+# Protein interaction analysis
+python cli.py biomni "Identify protein-protein interaction partners of IFNG and map downstream signaling."
+
+# scRNA-seq full pipeline via Biomni
+python cli.py biomni "Download scRNA-seq data for IFNG from GEO, preprocess, and perform cell type annotation." \
+    --model claude-sonnet-4-6 --timeout 3600
+```
+
+---
+
+### GEO/SRA — Dataset Search and DEG Analysis
+
+```bash
+# Search for relevant datasets
+python cli.py geo "Search GEO for scRNA-seq datasets related to IFNG in human lung cancer, past 3 years."
+
+# Download and run DEG analysis
+python cli.py geo "Download GSE96058 and run DESeq2 differential expression analysis for IFNG." \
+    --project geo_analysis --timeout 1800
+
+# Full pipeline: search → download → DEG → pathway enrichment
+python cli.py geo "Run full GEO pipeline for IFNG in Homo sapiens: find best dataset, DESeq2 DEG, GSEA pathway enrichment." \
+    --model claude-sonnet-4-6 --timeout 3600
+```
+
+---
+
+### Custom — Any workflow with a free-form prompt
+
+```bash
+python cli.py run --workflow CellAtria \
+    --prompt "Convert BD Rhapsody files in data/GSM8693206 to h5ad, then run CellExpress with doublet detection." \
+    --model claude-sonnet-4-6 --project custom_run --timeout 3600
+```
+
+---
 
 **Global options** (all subcommands):
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--model` | haiku | Claude model ID |
-| `--project` | cli | Project name for results isolation |
-| `--timeout` | 1200 | Max run time in seconds |
-| `--base-url` | — | Custom API base URL (e.g. `http://localhost:4000` for LiteLLM/Ollama) |
+| `--model` | `claude-haiku-4-5-20251001` | Claude model ID |
+| `--project` | `cli` | Project name for results isolation |
+| `--timeout` | `1200` | Max run time in seconds |
+| `--base-url` | — | Custom API endpoint (e.g. `http://localhost:4000` for LiteLLM/Ollama) |
 | `--no-live` | — | Suppress real-time output streaming |
 
 Results are saved to `results/{project}/` — same structure as the GUI and notebook.
