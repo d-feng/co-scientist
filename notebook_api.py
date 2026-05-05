@@ -71,6 +71,7 @@ def run_workflow(
     skip_datalake: bool = False,
     skip_vision: bool = False,
     live_output: bool = True,
+    base_url: str | None = None,
 ) -> dict:
     """
     Run any co-scientist workflow headlessly.
@@ -133,6 +134,9 @@ def run_workflow(
         "COSCIENTIST_RUN_DIR": str(run_dir),
         "STAGENT_PROJECT": project,
     }
+    if base_url:
+        env["ANTHROPIC_BASE_URL"] = base_url
+        env["OPENAI_BASE_URL"] = base_url
 
     proc = subprocess.Popen(
         [python_bin, "-c", script],
@@ -245,6 +249,7 @@ def run_cellatria(
     model: str = "claude-sonnet-4-6",
     project: str = "notebook",
     timeout: int = 1800,
+    base_url: str | None = None,
     **kwargs,
 ) -> dict:
     """
@@ -273,7 +278,7 @@ def run_cellatria(
                          f"Choose from: {list(_CELLATRIA_TEMPLATES)}")
     prompt = template.replace("{INPUT}", input).replace("{GENE}", gene)
     return run_workflow("CellAtria", prompt, model=model, project=project,
-                        timeout=timeout, **kwargs)
+                        timeout=timeout, base_url=base_url, **kwargs)
 
 
 def run_st_agent(
@@ -285,6 +290,7 @@ def run_st_agent(
     project: str = "notebook",
     skip_vision: bool = True,
     timeout: int = 1200,
+    base_url: str | None = None,
     **kwargs,
 ) -> dict:
     """
@@ -312,7 +318,7 @@ def run_st_agent(
                          f"Choose from: {list(_ST_AGENT_TEMPLATES)}")
     prompt = template.replace("{H5AD}", h5ad).replace("{GENE}", gene)
     return run_workflow("ST Agent", prompt, model=model, project=project,
-                        skip_vision=skip_vision, timeout=timeout, **kwargs)
+                        skip_vision=skip_vision, timeout=timeout, base_url=base_url, **kwargs)
 
 
 def run_biomni(
@@ -322,6 +328,7 @@ def run_biomni(
     project: str = "notebook",
     data_dir: str | None = None,
     timeout: int = 1200,
+    base_url: str | None = None,
     **kwargs,
 ) -> dict:
     """
@@ -337,7 +344,7 @@ def run_biomni(
     >>> run_biomni("Analyze differential expression of IFNG in GSE96058")
     """
     return run_workflow("Biomni", prompt, model=model, project=project,
-                        data_dir=data_dir, timeout=timeout, **kwargs)
+                        data_dir=data_dir, timeout=timeout, base_url=base_url, **kwargs)
 
 
 def run_geo_sra(
@@ -347,6 +354,7 @@ def run_geo_sra(
     project: str = "notebook",
     data_dir: str | None = None,
     timeout: int = 1200,
+    base_url: str | None = None,
     **kwargs,
 ) -> dict:
     """
@@ -362,4 +370,4 @@ def run_geo_sra(
     >>> run_geo_sra("Download GSE96058 and run DESeq2 DEG analysis for IFNG")
     """
     return run_workflow("GEO/SRA", prompt, model=model, project=project,
-                        data_dir=data_dir, timeout=timeout, **kwargs)
+                        data_dir=data_dir, timeout=timeout, base_url=base_url, **kwargs)

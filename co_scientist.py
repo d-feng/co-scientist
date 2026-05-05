@@ -155,6 +155,14 @@ class CoScientist(tk.Tk):
         ttk.Label(cfg, text="(blank = current pip env)", foreground="gray").grid(
             row=2, column=7, sticky="w", padx=(4, 0), pady=(4, 0))
 
+        # Row 3: base URL override (for custom endpoints / LiteLLM / Ollama gateway)
+        ttk.Label(cfg, text="Base URL:").grid(row=3, column=0, sticky="w", padx=(0, 4), pady=(4, 0))
+        self.base_url_var = tk.StringVar(value=os.environ.get("ANTHROPIC_BASE_URL", ""))
+        ttk.Entry(cfg, textvariable=self.base_url_var, width=46).grid(
+            row=3, column=1, columnspan=4, sticky="ew", pady=(4, 0), padx=(0, 4))
+        ttk.Label(cfg, text="(blank = default Anthropic/OpenAI API)", foreground="gray").grid(
+            row=3, column=5, columnspan=3, sticky="w", padx=(4, 0), pady=(4, 0))
+
         # ── Main body ─────────────────────────────────────────────────────────
         body = ttk.Frame(self)
         body.pack(fill="both", expand=True, padx=8, pady=4)
@@ -603,9 +611,12 @@ class CoScientist(tk.Tk):
                     text=True, encoding="utf-8", errors="replace",
                     env={**os.environ, "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1",
                          "STAGENT_SKIP_VISION": "1" if self.skip_vision_var.get() else "0",
-                         "STAGENT_PLOT_DIR": str(run_dir),   # STAgent reads this natively
-                         "COSCIENTIST_RUN_DIR": str(run_dir),  # general per-run folder for all workflows
-                         "STAGENT_PROJECT": project},
+                         "STAGENT_PLOT_DIR": str(run_dir),
+                         "COSCIENTIST_RUN_DIR": str(run_dir),
+                         "STAGENT_PROJECT": project,
+                         **( {"ANTHROPIC_BASE_URL": self.base_url_var.get().strip(),
+                              "OPENAI_BASE_URL":    self.base_url_var.get().strip()}
+                             if self.base_url_var.get().strip() else {} )},
                 )
                 _noise = ("WARNING", "scriptrunner", "ScriptRunContext",
                           "session_state", "streamlit run [FILE", "run it with")

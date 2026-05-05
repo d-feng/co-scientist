@@ -68,6 +68,7 @@ def cmd_cellatria(args):
         project=args.project,
         timeout=args.timeout,
         live_output=args.live,
+        base_url=args.base_url,
     )
     _print_result(result)
 
@@ -82,6 +83,7 @@ def cmd_st_agent(args):
         skip_vision=not args.vision,
         timeout=args.timeout,
         live_output=args.live,
+        base_url=args.base_url,
     )
     _print_result(result)
 
@@ -93,6 +95,7 @@ def cmd_biomni(args):
         project=args.project,
         timeout=args.timeout,
         live_output=args.live,
+        base_url=args.base_url,
     )
     _print_result(result)
 
@@ -104,6 +107,7 @@ def cmd_geo(args):
         project=args.project,
         timeout=args.timeout,
         live_output=args.live,
+        base_url=args.base_url,
     )
     _print_result(result)
 
@@ -116,6 +120,7 @@ def cmd_run(args):
         project=args.project,
         timeout=args.timeout,
         live_output=args.live,
+        base_url=args.base_url,
     )
     _print_result(result)
 
@@ -137,6 +142,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="Max run time in seconds (default: 1200)")
         p.add_argument("--no-live", dest="live", action="store_false", default=True,
                        help="Suppress real-time output streaming")
+        p.add_argument("--base-url", default=None,
+                       help="Custom API base URL (e.g. http://localhost:4000 for LiteLLM/Ollama gateway)")
 
     sub = parser.add_subparsers(dest="command", required=True)
 
