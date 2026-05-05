@@ -445,6 +445,75 @@ python cli.py run --workflow CellAtria \
 
 Results are saved to `results/{project}/` — same structure as the GUI and notebook.
 
+## File-driven Batch Runner (no GUI, no HTTP)
+
+For servers where no display or HTTP ports are available, use `run_jobs.py` — reads a YAML/JSON job file and runs workflows sequentially.
+
+```bash
+pip install pyyaml   # one-time
+
+# Preview jobs without running
+python run_jobs.py jobs.example.yaml --dry-run
+
+# Run all jobs
+python run_jobs.py jobs.example.yaml
+```
+
+**Job file format (`jobs.yaml`):**
+
+```yaml
+defaults:                              # applied to all jobs unless overridden
+  model: claude-haiku-4-5-20251001
+  project: batch_run
+  timeout: 1200
+
+jobs:
+  - name: "GEO metadata fetch"
+    workflow: cellatria
+    input: GSE284775
+    analysis: "GEO Dataset Retrieval"
+    gene: IFNG
+
+  - name: "Spatial expression"
+    workflow: st-agent
+    h5ad: data/sample.h5ad
+    gene: IFNG
+    analysis: "Spatial Gene Expression"
+    model: claude-sonnet-4-6           # override default
+
+  - name: "Biomni literature"
+    workflow: biomni
+    prompt: "Characterize the role of IFNG in tumor immune evasion."
+
+  - name: "GEO DEG analysis"
+    workflow: geo
+    prompt: "Download GSE96058 and run DESeq2 DEG analysis for IFNG."
+
+  - name: "Custom prompt"
+    workflow: run
+    workflow_name: CellAtria
+    prompt: "Convert BD Rhapsody files in data/GSM123 to h5ad."
+    timeout: 3600
+```
+
+**Per-job fields:**
+
+| Field | Workflows | Description |
+|-------|-----------|-------------|
+| `workflow` | all | `cellatria`, `st-agent`, `biomni`, `geo`, `run` |
+| `input` | cellatria | GEO accession, URL, or PDF path |
+| `analysis` | cellatria, st-agent | Analysis type |
+| `gene` | cellatria, st-agent | Target gene (default: IFNG) |
+| `h5ad` | st-agent | Path to .h5ad file |
+| `prompt` | biomni, geo, run | Free-form query |
+| `workflow_name` | run | Workflow name for generic `run` |
+| `model` | all | Override model for this job |
+| `project` | all | Override project for this job |
+| `timeout` | all | Override timeout for this job |
+| `base_url` | all | Custom API endpoint |
+
+See `jobs.example.yaml` for a complete example.
+
 ## Jupyter Notebook
 
 All workflows can be run headlessly from `co_scientist.ipynb` — no tkinter / GUI required.

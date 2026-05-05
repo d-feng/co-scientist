@@ -1,0 +1,62 @@
+# Co-scientist example job file
+# Run with: python run_jobs.py jobs.example.yaml
+# Preview:  python run_jobs.py jobs.example.yaml --dry-run
+
+defaults:
+  model: claude-haiku-4-5-20251001
+  project: batch_run
+  timeout: 1200
+
+jobs:
+  - name: "CellAtria — GEO metadata fetch"
+    workflow: cellatria
+    input: GSE284775
+    analysis: "GEO Dataset Retrieval"
+    gene: IFNG
+
+  - name: "CellAtria — Full scRNA-seq pipeline"
+    workflow: cellatria
+    input: GSE284775
+    analysis: "Full Pipeline"
+    gene: IFNG
+    model: claude-sonnet-4-6    # override default model
+    timeout: 3600
+
+  - name: "CellAtria — Article metadata from URL"
+    workflow: cellatria
+    input: "https://www.nature.com/articles/s41467-021-27729-z"
+    analysis: "Metadata Extraction (URL)"
+    gene: IFNG
+
+  - name: "ST Agent — Spatial gene expression"
+    workflow: st-agent
+    h5ad: data/sample.h5ad
+    gene: IFNG
+    analysis: "Spatial Gene Expression"
+
+  - name: "ST Agent — Full analysis report"
+    workflow: st-agent
+    h5ad: data/sample.h5ad
+    gene: IFNG
+    analysis: "Full Analysis Report"
+    model: claude-sonnet-4-6
+    timeout: 1800
+    project: st_analysis
+
+  - name: "Biomni — Literature characterization"
+    workflow: biomni
+    prompt: "Characterize the role of IFNG in tumor immune evasion. Summarize key findings."
+    project: biomni_research
+
+  - name: "GEO/SRA — DEG analysis"
+    workflow: geo
+    prompt: "Download GSE96058 and run DESeq2 differential expression analysis for IFNG."
+    timeout: 1800
+
+  - name: "Custom — BD Rhapsody conversion"
+    workflow: run
+    workflow_name: CellAtria
+    prompt: "Convert BD Rhapsody files in data/GSM8693206 to h5ad, then run CellExpress with doublet detection on human PBMC samples."
+    model: claude-sonnet-4-6
+    timeout: 3600
+    project: rhapsody_project
