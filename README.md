@@ -46,7 +46,11 @@ GOOGLE_API_KEY=your_key_here
 NCBI_API_KEY=your_ncbi_key_here
 
 # Optional — shared data directory for Biomni/GEO data lake (default: ~/biomni_data)
-COSCIENTIST_DATA_DIR=/path/to/shared/data
+# Data lake is downloaded once and reused across all runs.
+# Windows example:
+# COSCIENTIST_DATA_DIR=C:\Users\yourname\co_scientist_data
+# Linux / Mac example:
+COSCIENTIST_DATA_DIR=/data/co_scientist_data
 
 # Optional — override API endpoint (LiteLLM / Ollama gateway)
 ANTHROPIC_BASE_URL=http://localhost:4000
