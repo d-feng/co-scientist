@@ -58,9 +58,52 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.resolve()))
 
 from notebook_api import (
-    run_workflow, run_cellatria, run_st_agent, run_biomni, run_geo_sra,
+    run_workflow,
     _CELLATRIA_TEMPLATES, _ST_AGENT_TEMPLATES,
 )
+
+
+def _memory_prefix(project: str, query: str, workflow_name: str) -> str:
+    """Return formatted memory context block, or empty string on failure."""
+    try:
+        import memory as mem
+        entries = mem.search(project, query, workflow_filter=workflow_name)
+        if not entries:
+            return ""
+        lines = [
+            "=== RELEVANT PROJECT MEMORY ===",
+            f"(Project: {project} — {len(entries)} prior result(s))\n",
+        ]
+        for i, e in enumerate(entries, 1):
+            lines.append(f"[{i}] {e['workflow']} | {e['preset']} | gene={e['gene']}")
+            lines.append(f"    Timestamp : {e['timestamp'][:19]}")
+            lines.append(f"    Summary   : {e['summary']}")
+            if e.get("notes"):
+                lines.append(f"    Notes     : {e['notes']}")
+            lines.append("")
+        lines.append("=== END MEMORY ===\n")
+        print(f"[Memory] {len(entries)} relevant entry/entries prepended from project '{project}'.")
+        return "\n".join(lines)
+    except Exception as exc:
+        print(f"[Memory] Search skipped: {exc}", file=sys.stderr)
+        return ""
+
+
+def _auto_save(project, workflow_name, gene, preset, model, base_prompt, result):
+    """Auto-keep result in project memory (no interactive prompt for batch runs)."""
+    try:
+        import memory as mem
+        full_text = result.get("output", "")
+        log_path  = result.get("log", Path("/dev/null"))
+        run_id = mem.save_pending(
+            project, workflow_name, gene, preset, model,
+            base_prompt, full_text, log_path,
+        )
+        if run_id:
+            mem.keep(project, run_id)
+            print(f"[Memory] Result auto-saved to project '{project}'.")
+    except Exception as exc:
+        print(f"[Memory] Save skipped: {exc}", file=sys.stderr)
 
 
 def _load_job_file(path: str) -> dict:
@@ -90,12 +133,13 @@ def _merge(defaults: dict, job: dict) -> dict:
 
 
 def _run_job(job: dict, dry_run: bool) -> bool:
-    name     = job.get("name", "(unnamed)")
-    workflow = job.get("workflow", "").lower().strip()
-    model    = job.get("model", "claude-haiku-4-5-20251001")
-    project  = job.get("project", "batch_run")
-    timeout  = int(job.get("timeout", 1200))
-    base_url = job.get("base_url") or None
+    name       = job.get("name", "(unnamed)")
+    workflow   = job.get("workflow", "").lower().strip()
+    model      = job.get("model", "claude-haiku-4-5-20251001")
+    project    = job.get("project", "batch_run")
+    timeout    = int(job.get("timeout", 1200))
+    base_url   = job.get("base_url") or None
+    use_memory = job.get("memory", True)
 
     print(f"\n{'='*60}")
     print(f"Job: {name}")
@@ -107,60 +151,77 @@ def _run_job(job: dict, dry_run: bool) -> bool:
         return True
 
     try:
+        # Build base_prompt and metadata for each workflow type
         if workflow == "cellatria":
-            analysis = job.get("analysis", "Full Pipeline")
-            inp      = job.get("input", "")
-            gene     = job.get("gene", "IFNG")
+            analysis   = job.get("analysis", "Full Pipeline")
+            inp        = job.get("input", "")
+            gene       = job.get("gene", "IFNG")
+            preset     = analysis
+            wf_name    = "CellAtria"
             if not inp:
-                print(f"ERROR: 'input' required for cellatria workflow")
+                print("ERROR: 'input' required for cellatria workflow")
                 return False
-            result = run_cellatria(inp, analysis=analysis, gene=gene,
-                                   model=model, project=project,
-                                   timeout=timeout, base_url=base_url)
+            template   = _CELLATRIA_TEMPLATES.get(analysis, _CELLATRIA_TEMPLATES["Full Pipeline"])
+            base_prompt = template.replace("{INPUT}", inp).replace("{GENE}", gene)
 
         elif workflow == "st-agent":
-            h5ad     = job.get("h5ad", "")
-            gene     = job.get("gene", "IFNG")
-            analysis = job.get("analysis", "Spatial Gene Expression")
-            vision   = job.get("vision", False)
+            h5ad       = job.get("h5ad", "")
+            gene       = job.get("gene", "IFNG")
+            analysis   = job.get("analysis", "Spatial Gene Expression")
+            vision     = job.get("vision", False)
+            preset     = analysis
+            wf_name    = "ST Agent"
             if not h5ad:
-                print(f"ERROR: 'h5ad' required for st-agent workflow")
+                print("ERROR: 'h5ad' required for st-agent workflow")
                 return False
-            result = run_st_agent(h5ad, gene=gene, analysis=analysis,
-                                  model=model, project=project,
-                                  skip_vision=not vision,
-                                  timeout=timeout, base_url=base_url)
+            template   = _ST_AGENT_TEMPLATES.get(analysis, _ST_AGENT_TEMPLATES["Spatial Gene Expression"])
+            base_prompt = template.replace("{H5AD}", h5ad).replace("{GENE}", gene)
 
         elif workflow == "biomni":
-            prompt = job.get("prompt", "")
-            if not prompt:
-                print(f"ERROR: 'prompt' required for biomni workflow")
+            base_prompt = job.get("prompt", "")
+            gene        = job.get("gene", "")
+            preset      = ""
+            wf_name     = "Biomni"
+            if not base_prompt:
+                print("ERROR: 'prompt' required for biomni workflow")
                 return False
-            result = run_biomni(prompt, model=model, project=project,
-                                timeout=timeout, base_url=base_url)
 
         elif workflow == "geo":
-            prompt = job.get("prompt", "")
-            if not prompt:
-                print(f"ERROR: 'prompt' required for geo workflow")
+            base_prompt = job.get("prompt", "")
+            gene        = job.get("gene", "")
+            preset      = ""
+            wf_name     = "GEO/SRA"
+            if not base_prompt:
+                print("ERROR: 'prompt' required for geo workflow")
                 return False
-            result = run_geo_sra(prompt, model=model, project=project,
-                                 timeout=timeout, base_url=base_url)
 
         elif workflow == "run":
-            workflow_name = job.get("workflow_name", "")
-            prompt        = job.get("prompt", "")
-            if not workflow_name or not prompt:
-                print(f"ERROR: 'workflow_name' and 'prompt' required for run workflow")
+            wf_name     = job.get("workflow_name", "")
+            base_prompt = job.get("prompt", "")
+            gene        = job.get("gene", "")
+            preset      = ""
+            if not wf_name or not base_prompt:
+                print("ERROR: 'workflow_name' and 'prompt' required for run workflow")
                 return False
-            result = run_workflow(workflow_name, prompt, model=model,
-                                  project=project, timeout=timeout,
-                                  base_url=base_url)
 
         else:
             print(f"ERROR: Unknown workflow '{workflow}'. "
                   f"Use: cellatria, st-agent, biomni, geo, run")
             return False
+
+        # Memory lookup
+        prefix = _memory_prefix(project, base_prompt, wf_name) if use_memory else ""
+        full_prompt = prefix + base_prompt
+
+        # Run
+        run_kwargs = {"model": model, "project": project, "timeout": timeout, "base_url": base_url}
+        if workflow == "st-agent":
+            run_kwargs["skip_vision"] = not vision
+        result = run_workflow(wf_name, full_prompt, **run_kwargs)
+
+        # Auto-save to memory
+        if use_memory and result["success"]:
+            _auto_save(project, wf_name, gene, preset, model, base_prompt, result)
 
         return result["success"]
 
