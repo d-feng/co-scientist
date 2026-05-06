@@ -1,7 +1,5 @@
 """CellAtria (AstraZeneca) single-cell RNA-seq workflow plugin."""
 import os
-import tkinter as tk
-from tkinter import ttk, filedialog
 from pathlib import Path
 from .base import BaseWorkflow
 
@@ -50,6 +48,8 @@ class CellatriaWorkflow(BaseWorkflow):
         self.query_text = None
 
     def build_input_panel(self, parent):
+        import tkinter as tk
+        from tkinter import ttk, filedialog
         frame = ttk.LabelFrame(parent, text="CellAtria — Single-cell RNA-seq", padding=6)
         frame.columnconfigure(1, weight=1)
         frame.rowconfigure(4, weight=1)
@@ -95,6 +95,7 @@ class CellatriaWorkflow(BaseWorkflow):
         return frame
 
     def _browse_pdf(self):
+        from tkinter import filedialog
         path = filedialog.askopenfilename(
             title="Select PDF",
             filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")]

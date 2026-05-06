@@ -1,6 +1,4 @@
 """GEO/SRA agentic workflow plugin."""
-import tkinter as tk
-from tkinter import ttk
 from .base import BaseWorkflow
 
 DEFAULT_GENE = "IFNG"
@@ -69,6 +67,8 @@ class GeoSraWorkflow(BaseWorkflow):
         self.query_text = None
 
     def build_input_panel(self, parent):
+        import tkinter as tk
+        from tkinter import ttk
         frame = ttk.LabelFrame(parent, text="GEO/SRA — Query", padding=6)
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(3, weight=1)

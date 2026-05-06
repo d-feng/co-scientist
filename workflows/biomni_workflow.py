@@ -1,6 +1,4 @@
 """Biomni agentic workflow plugin."""
-import tkinter as tk
-from tkinter import ttk
 from .base import BaseWorkflow
 
 DEFAULT_GENE = "IFNG"
@@ -38,6 +36,8 @@ class BiomniWorkflow(BaseWorkflow):
         self.prompt_text = None
 
     def build_input_panel(self, parent):
+        import tkinter as tk
+        from tkinter import ttk
         frame = ttk.LabelFrame(parent, text="Biomni — Prompt", padding=6)
         frame.columnconfigure(1, weight=1)
         frame.rowconfigure(2, weight=1)

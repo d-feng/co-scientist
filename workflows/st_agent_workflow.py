@@ -1,7 +1,5 @@
 """Spatial Transcriptomics (STAgent) workflow plugin — Harvard Liu Lab."""
 import os
-import tkinter as tk
-from tkinter import ttk, filedialog
 from pathlib import Path
 from .base import BaseWorkflow
 
@@ -66,6 +64,8 @@ class StAgentWorkflow(BaseWorkflow):
         self.query_text = None
 
     def build_input_panel(self, parent):
+        import tkinter as tk
+        from tkinter import ttk, filedialog
         frame = ttk.LabelFrame(parent, text="Spatial Transcriptomics — STAgent", padding=6)
         frame.columnconfigure(1, weight=1)
         frame.rowconfigure(5, weight=1)
