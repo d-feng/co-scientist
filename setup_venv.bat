@@ -17,7 +17,8 @@ call "%VENV_DIR%\Scripts\activate.bat"
 echo.
 echo [3/6] Installing core dependencies...
 pip install --upgrade pip
-pip install biomni langgraph chromadb python-dotenv
+pip install -r "%~dp0requirements.txt"
+pip install chromadb
 if errorlevel 1 ( echo ERROR: Failed. && pause && exit /b 1 )
 
 echo.

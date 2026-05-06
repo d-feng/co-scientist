@@ -30,7 +30,8 @@ source "$VENV_DIR/bin/activate"
 
 echo && echo "[3/6] Installing core dependencies..."
 pip install --upgrade pip
-pip install biomni langgraph chromadb python-dotenv
+pip install -r "$SCRIPT_DIR/requirements.txt"
+pip install chromadb   # chromadb used by biomni/STAgent vector store
 
 echo && echo "[4/6] Installing PyTorch..."
 TORCH_URL="https://download.pytorch.org/whl/cpu"

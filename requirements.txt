@@ -1,0 +1,31 @@
+# Co-scientist core requirements
+# Minimal deps needed to run the GUI, CLI, notebook API, and job runner.
+# Workflow-specific deps are installed by setup_venv.sh (or setup_venv.bat on Windows).
+#
+# Quick install (all platforms):
+#   pip install -r requirements.txt
+#
+# Full install with all workflow backends:
+#   bash setup_venv.sh          # Linux / Mac
+#   setup_venv.bat              # Windows
+
+# ── Core ──────────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.1       # .env file loading (used by all workflows)
+pyyaml>=6.0                # YAML job files for run_jobs.py
+
+# ── Biomni (Stanford SNAP) ────────────────────────────────────────────────────
+# Pulls in langchain, langchain-community, langchain-anthropic, openai, etc.
+biomni
+
+# ── LangChain / LangGraph (needed by CellAtria & GEO/SRA headless runner) ────
+langchain>=0.3.11
+langchain-core>=0.3.24
+langchain-community>=0.3.11
+langchain-anthropic>=0.3.15
+langchain-openai>=0.3.7
+langchain-google-genai>=2.1.5
+langgraph>=0.5.4
+google-generativeai>=0.8.3
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+requests>=2.32
