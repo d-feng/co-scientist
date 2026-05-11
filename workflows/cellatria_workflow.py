@@ -200,7 +200,7 @@ class _AgentState(TypedDict):
     messages: Annotated[List, add_messages]
 
 _gb = StateGraph(_AgentState)
-_gb.add_node("tools", ToolNode(_cellatria_tools))
+_gb.add_node("tools", ToolNode(_cellatria_tools, handle_tool_errors=True))
 _gb.add_node("chatbot", lambda state: {{"messages": _chat_fn.invoke(state["messages"])}})
 _gb.add_edge("tools", "chatbot")
 _gb.add_conditional_edges("chatbot", tools_condition)

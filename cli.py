@@ -212,6 +212,7 @@ def cmd_biomni(args):
         "Biomni", args.prompt,
         gene="", preset="",
         args=args,
+        data_dir=args.data_dir,
     )
     _print_result(result)
 
@@ -221,6 +222,7 @@ def cmd_geo(args):
         "GEO/SRA", args.prompt,
         gene="", preset="",
         args=args,
+        data_dir=args.data_dir,
     )
     _print_result(result)
 
@@ -310,12 +312,16 @@ def build_parser() -> argparse.ArgumentParser:
     # ── biomni ────────────────────────────────────────────────────────────────
     p_bio = sub.add_parser("biomni", help="General biomedical agent (Biomni / Stanford)")
     p_bio.add_argument("prompt", help="Free-form biomedical query")
+    p_bio.add_argument("--data-dir", default=None,
+                       help="Data directory for Biomni agent (default: COSCIENTIST_DATA_DIR or ~/biomni_data)")
     add_globals(p_bio)
     p_bio.set_defaults(model=SONNET_MODEL)
 
     # ── geo ───────────────────────────────────────────────────────────────────
     p_geo = sub.add_parser("geo", help="GEO/SRA dataset search and DEG analysis")
     p_geo.add_argument("prompt", help="Free-form GEO/SRA query or accession")
+    p_geo.add_argument("--data-dir", default=None,
+                       help="Data directory for GEO/SRA downloads (default: COSCIENTIST_DATA_DIR or ~/biomni_data)")
     add_globals(p_geo)
 
     # ── run ───────────────────────────────────────────────────────────────────
