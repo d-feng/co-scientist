@@ -137,12 +137,18 @@ class StAgentWorkflow(BaseWorkflow):
 
     def get_run_script(self, model, data_dir, timeout, skip_datalake, full_prompt) -> str:
         st_src = str(ST_AGENT_SRC).replace("\\", "/")
+        project_root = str(Path(__file__).parent.parent).replace("\\", "/")
         return f"""
 import sys, os
 from pathlib import Path
 from dotenv import load_dotenv
 
 st_src = {repr(st_src)}
+# Load project .env first so GEMINI_API_KEY / OPENAI_API_KEY override any stale system vars
+load_dotenv(Path({repr(project_root)}) / ".env", override=True)
+# STAgent uses GOOGLE_API_KEY; forward GEMINI_API_KEY if set
+if os.environ.get("GEMINI_API_KEY") and not os.environ.get("GOOGLE_API_KEY"):
+    os.environ["GOOGLE_API_KEY"] = os.environ["GEMINI_API_KEY"]
 # Suppress Streamlit "missing ScriptRunContext" warnings before importing anything
 os.environ["STREAMLIT_LOGGER_LEVEL"] = "error"
 import logging
@@ -151,14 +157,18 @@ import warnings
 warnings.filterwarnings("ignore")
 sys.path.insert(0, st_src)
 os.chdir(st_src)
-load_dotenv(Path(st_src) / ".env")
-# STAgent initializes all LLM providers at startup; set dummy keys so Google/OpenAI SDK
-# don't raise DefaultCredentialsError when only Anthropic is used.
+load_dotenv(Path(st_src) / ".env")   # STAgent's own .env (lower priority)
+# Set dummy keys for providers not in use so SDKs don't raise credential errors
 os.environ.setdefault("GOOGLE_API_KEY", "dummy")
 os.environ.setdefault("OPENAI_API_KEY", "dummy")
 # Force non-interactive matplotlib backend so plots save to file instead of opening a window
 import matplotlib
 matplotlib.use("Agg")
+
+# Patch STAgent config to register gemini-2.5-flash before UnifiedLLMGraph is imported
+import config as _st_config
+_st_config.app_config.models.setdefault("gemini", {{}})
+_st_config.app_config.models["gemini"].setdefault("gemini-2.5-flash", {{"temperature": 0}})
 
 from langchain_core.messages import HumanMessage, ToolMessage
 from graph_unified import invoke_our_graph, UnifiedLLMGraph
@@ -193,7 +203,7 @@ def _patched_call_model(self, state, config):
             if isinstance(msg, ToolMessage) and getattr(msg, "artifact", None):
                 msg.artifact = None
     import datetime as _dt
-    print(f"[{_dt.datetime.now().strftime('%H:%M:%S')}] LLM call ({n_msgs} messages in context)...")
+    print(f"[{{_dt.datetime.now().strftime('%H:%M:%S')}}] LLM call ({{n_msgs}} messages in context)...")
     return _orig_call_model(self, state, config)
 
 UnifiedLLMGraph._call_model = _patched_call_model
@@ -204,6 +214,8 @@ _model_map = {{
     "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
     "claude-sonnet-4-6": "claude-sonnet-4-20250514",
     "claude-opus-4-6":   "claude-opus-4-20250514",
+    "gemini-2.5-flash":  "gemini-2.5-flash",
+    "gpt-4o":            "gpt-4o",
 }}
 _model = _model_map.get({repr(model)}, {repr(model)})
 
@@ -212,7 +224,7 @@ _headless = (
     "This is a headless automated run — do NOT ask for confirmation or follow-up questions. "
     "Execute the full requested analysis and deliver the complete result directly."
 )
-_output_dir_hint = f" Use output_dir={repr(_run_dir)} for all file outputs." if _run_dir else ""
+_output_dir_hint = (" Use output_dir=" + repr(_run_dir) + " for all file outputs.") if _run_dir else ""
 query = {repr(full_prompt)} + _output_dir_hint + " " + _headless
 messages = [HumanMessage(content=query)]
 
