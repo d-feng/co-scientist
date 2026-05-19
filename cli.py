@@ -40,6 +40,12 @@ import argparse
 import sys
 from pathlib import Path
 
+# Windows cp1252 can't encode emoji/Unicode that agents emit; force UTF-8
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Ensure repo root is on path
 sys.path.insert(0, str(Path(__file__).parent.resolve()))
 

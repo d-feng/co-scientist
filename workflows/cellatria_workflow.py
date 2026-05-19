@@ -120,11 +120,13 @@ class CellatriaWorkflow(BaseWorkflow):
 
     def get_run_script(self, model, data_dir, timeout, skip_datalake, full_prompt) -> str:
         agent_src = str(CELLATRIA_AGENT).replace("\\", "/")
-        # Map co-scientist model IDs to cellatria-compatible names
+        project_root = str(Path(__file__).parent.parent).replace("\\", "/")
         _model_map = {
             "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
             "claude-sonnet-4-6": "claude-sonnet-4-6",
             "claude-opus-4-6": "claude-opus-4-5",
+            "gemini-2.5-flash": "gemini-2.5-flash",
+            "gpt-4o": "gpt-4o",
         }
         return f"""
 import sys, os
@@ -156,22 +158,28 @@ for _k in ["Blocks","Row","Column","Chatbot","Textbox","Button",
     setattr(_gr_stub, _k, _Stub())
 sys.modules.setdefault("gradio", _gr_stub)
 
-# Load repo .env for ANTHROPIC_API_KEY, then write a cellatria .env
-load_dotenv(Path(agent_src).parent.parent.parent / ".env")
+# Stub google.generativeai so utils.py imports cleanly without the package installed
+if "google.generativeai" not in sys.modules:
+    _genai_stub = _types.ModuleType("google.generativeai")
+    _genai_stub.configure = lambda **kw: None
+    _genai_stub.GenerativeModel = _Stub
+    sys.modules["google.generativeai"] = _genai_stub
+    try:
+        import google as _google_pkg
+        if not hasattr(_google_pkg, "generativeai"):
+            setattr(_google_pkg, "generativeai", _genai_stub)
+    except ImportError:
+        pass
+
+# Load project .env with override so GEMINI/OPENAI/ANTHROPIC keys win over stale system vars
+load_dotenv(Path({repr(project_root)}) / ".env", override=True)
 
 _run_dir = os.environ.get("COSCIENTIST_RUN_DIR", {repr(data_dir)})
 Path(_run_dir).mkdir(parents=True, exist_ok=True)
 
-# Cellatria reads provider + key from a .env file in the env_path directory
-_cellatria_env = Path(agent_src) / ".env"
 _model_raw = {repr(model)}
 _model_map = {repr(_model_map)}
 _model = _model_map.get(_model_raw, _model_raw)
-_cellatria_env.write_text(
-    f"PROVIDER=Anthropic\\n"
-    f"ANTHROPIC_API_KEY={{os.environ.get('ANTHROPIC_API_KEY', '')}}\\n"
-    f"ANTHROPIC_MODEL={{_model}}\\n"
-)
 
 import uuid
 from typing import Annotated, List
@@ -184,10 +192,30 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
 
 # Build graph directly — avoids importing Gradio UI from base.py
-from utils import get_llm_from_env
 from toolkit import tools as _cellatria_tools
 
-_llm = get_llm_from_env(agent_src)
+# Construct LLM based on model provider
+if "gemini" in _model:
+    from langchain_openai import ChatOpenAI
+    _llm = ChatOpenAI(
+        model=_model,
+        openai_api_key=os.environ.get("GEMINI_API_KEY", ""),
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        temperature=0,
+    )
+elif _model.startswith("gpt-"):
+    from langchain_openai import ChatOpenAI
+    _llm = ChatOpenAI(model=_model, openai_api_key=os.environ.get("OPENAI_API_KEY", ""))
+else:
+    # Anthropic — write .env for get_llm_from_env
+    _cellatria_env = Path(agent_src) / ".env"
+    _cellatria_env.write_text(
+        f"PROVIDER=Anthropic\\n"
+        f"ANTHROPIC_API_KEY={{os.environ.get('ANTHROPIC_API_KEY', '')}}\\n"
+        f"ANTHROPIC_MODEL={{_model}}\\n"
+    )
+    from utils import get_llm_from_env
+    _llm = get_llm_from_env(agent_src)
 with open(f"{{agent_src}}/system_prompts.md", encoding="utf-8") as _f:
     _system_message = _f.read()
 _prompt = ChatPromptTemplate.from_messages([
