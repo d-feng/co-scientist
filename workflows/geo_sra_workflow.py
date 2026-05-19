@@ -48,6 +48,24 @@ Always use RAW counts for DESeq2/edgeR/limma-voom — never TPM/FPKM.
 Small samples (n<10/group): use nominal p<0.01 + GSEA ranked list instead of FDR cutoff.
 GSEA: use shrunken LFC ranked list with clusterProfiler gseGO + gseKEGG.
 Rate limit: set NCBI_API_KEY env var for 10 req/sec (vs 3 req/sec default).
+
+pyDESeq2 v0.5.4 correct API (installed version — use exactly this):
+  from pydeseq2.dds import DeseqDataSet
+  from pydeseq2.ds import DeseqStats
+  dds = DeseqDataSet(counts=counts_df, metadata=meta_df, design_factors="condition")
+  dds.deseq2()
+  stats = DeseqStats(dds, contrast=["condition", "treatment", "control"])
+  stats.summary()
+  results_df = stats.results_df   # <- this is the results DataFrame
+
+Gene symbol annotation after DEG (Ensembl IDs → gene symbols):
+  Python: pip install mygene
+    import mygene; mg = mygene.MyGeneInfo()
+    mapping = mg.querymany(ensembl_ids, scopes="ensembl.gene", fields="symbol", species="human", as_dataframe=True)
+    results_df["symbol"] = results_df.index.map(mapping["symbol"])
+  R: use bitr(ids, fromType="ENSEMBL", toType="SYMBOL", OrgDb=org.Hs.eg.db)
+  Always strip version suffix before mapping (ENSG00000073756.12 → ENSG00000073756).
+  Add "symbol" column to results_df and use it for all gene-of-interest lookups.
 === END SKILL CONTEXT ===
 """
 
@@ -162,7 +180,7 @@ class GeoSraWorkflow(BaseWorkflow):
 import sys, os
 from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 from biomni.agent import A1
 from biomni.config import default_config

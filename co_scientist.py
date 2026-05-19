@@ -25,13 +25,47 @@ DEFAULT_DATA_DIR = os.environ.get("COSCIENTIST_DATA_DIR", str(HOME / "biomni_dat
 DEFAULT_TIMEOUT = 1200
 
 MODELS = [
-    "claude-haiku-4-5-20251001",
-    "claude-sonnet-4-6",
-    "claude-opus-4-6",
+    "gemini-2.5-flash",
     "gpt-4o",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-opus-4-6",
     "gpt-4-turbo",
-    "gemini-2.0-flash",
 ]
+
+# Ordered fallback chain tried automatically when the chosen model hits a quota/auth error
+MODEL_FALLBACK_CHAIN = [
+    "gemini-2.5-flash",
+    "gpt-4o",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5-20251001",
+]
+
+# Substrings in subprocess output that indicate a quota / auth failure worth retrying
+_QUOTA_ERROR_PATTERNS = (
+    "insufficient_quota",
+    "credit balance is too low",
+    "RateLimitError",
+    "You exceeded your current quota",
+    "AuthenticationError",
+    "invalid_api_key",
+    "Incorrect API key",
+    "quota",
+)
+
+
+def _has_quota_error(lines: list) -> bool:
+    text = "".join(lines[-120:])   # only check the tail to avoid false positives
+    return any(p in text for p in _QUOTA_ERROR_PATTERNS)
+
+
+def _fallback_chain(chosen_model: str) -> list:
+    """Return [chosen_model, ...fallbacks] without duplicates."""
+    chain = [chosen_model]
+    for m in MODEL_FALLBACK_CHAIN:
+        if m not in chain:
+            chain.append(m)
+    return chain
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -570,7 +604,7 @@ class CoScientist(tk.Tk):
         meta = wf.get_metadata()
         gene = meta.get("gene", "unknown")
         preset = meta.get("preset", "")
-        model = self.model_var.get()
+        chosen_model = self.model_var.get()
         project = self.project_var.get()
         data_dir = self.data_dir_var.get()
         timeout = self.timeout_var.get()
@@ -583,12 +617,10 @@ class CoScientist(tk.Tk):
         run_dir.mkdir(parents=True, exist_ok=True)
         log_path = run_dir / "run.log"
 
-        script = wf.get_run_script(model, data_dir, timeout, skip_datalake, full_prompt)
-
         python_bin = wf.get_python_bin()
         self._append_output(
             f"[{timestamp}] Workflow: {wf.name} | Project: {project}\n"
-            f"Gene: {gene} | Preset: {preset} | Model: {model}\n"
+            f"Gene: {gene} | Preset: {preset} | Model: {chosen_model}\n"
             f"Python: {python_bin}\n"
             f"Results: {run_dir}\n"
             f"Log: {log_path}\n{'='*60}\n"
@@ -596,47 +628,62 @@ class CoScientist(tk.Tk):
 
         full_result = []
         completed = False
+        model = chosen_model  # may change on fallback
 
         try:
             with open(log_path, "w", encoding="utf-8") as log_file:
                 log_file.write(
                     f"Co-scientist — {timestamp}\nWorkflow: {wf.name}\nProject: {project}\n"
-                    f"Gene: {gene}\nPreset: {preset}\nModel: {model}\n"
+                    f"Gene: {gene}\nPreset: {preset}\nModel: {chosen_model}\n"
                     f"Prompt:\n{base_prompt}\n\n{'='*60}\n\n"
                 )
-                python_bin = wf.get_python_bin()
-                proc = subprocess.Popen(
-                    [python_bin, "-c", script],
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True, encoding="utf-8", errors="replace",
-                    env={**os.environ, "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1",
-                         "STAGENT_SKIP_VISION": "1" if self.skip_vision_var.get() else "0",
-                         "STAGENT_PLOT_DIR": str(run_dir),
-                         "COSCIENTIST_RUN_DIR": str(run_dir),
-                         "STAGENT_PROJECT": project,
-                         **( {"ANTHROPIC_BASE_URL": self.base_url_var.get().strip(),
-                              "OPENAI_BASE_URL":    self.base_url_var.get().strip()}
-                             if self.base_url_var.get().strip() else {} )},
-                )
-                _noise = ("WARNING", "scriptrunner", "ScriptRunContext",
-                          "session_state", "streamlit run [FILE", "run it with")
-                for line in proc.stdout:
-                    if self._stop_flag.is_set():
-                        proc.terminate()
-                        self._append_output("\n[Stopped by user]\n")
-                        log_file.write("\n[Stopped by user]\n")
-                        break
-                    if any(n in line for n in _noise):
-                        continue
-                    self._append_output(line)
-                    log_file.write(line)
-                    full_result.append(line)
 
-                proc.wait()
-                completed = proc.returncode == 0
-                status = "Completed" if completed else f"Exited with code {proc.returncode}"
-                self._append_output(f"\n[{status}]\n")
-                log_file.write(f"\n[{status}]\n")
+                for model in _fallback_chain(chosen_model):
+                    if model != chosen_model:
+                        msg = f"\n[Quota/auth error — retrying with {model}]\n"
+                        self._append_output(msg)
+                        log_file.write(msg)
+                        full_result = []
+
+                    script = wf.get_run_script(model, data_dir, timeout, skip_datalake, full_prompt)
+                    python_bin = wf.get_python_bin()
+                    proc = subprocess.Popen(
+                        [python_bin, "-c", script],
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        text=True, encoding="utf-8", errors="replace",
+                        env={**os.environ, "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1",
+                             "STAGENT_SKIP_VISION": "1" if self.skip_vision_var.get() else "0",
+                             "STAGENT_PLOT_DIR": str(run_dir),
+                             "COSCIENTIST_RUN_DIR": str(run_dir),
+                             "STAGENT_PROJECT": project,
+                             **( {"ANTHROPIC_BASE_URL": self.base_url_var.get().strip(),
+                                  "OPENAI_BASE_URL":    self.base_url_var.get().strip()}
+                                 if self.base_url_var.get().strip() else {} )},
+                    )
+                    _noise = ("WARNING", "scriptrunner", "ScriptRunContext",
+                              "session_state", "streamlit run [FILE", "run it with")
+                    for line in proc.stdout:
+                        if self._stop_flag.is_set():
+                            proc.terminate()
+                            self._append_output("\n[Stopped by user]\n")
+                            log_file.write("\n[Stopped by user]\n")
+                            break
+                        if any(n in line for n in _noise):
+                            continue
+                        self._append_output(line)
+                        log_file.write(line)
+                        full_result.append(line)
+
+                    proc.wait()
+                    completed = proc.returncode == 0
+                    status = "Completed" if completed else f"Exited with code {proc.returncode}"
+                    self._append_output(f"\n[{status}]\n")
+                    log_file.write(f"\n[{status}]\n")
+
+                    if completed or self._stop_flag.is_set():
+                        break
+                    if not _has_quota_error(full_result):
+                        break   # failed for a non-quota reason — don't try other models
 
         except Exception as e:
             self._append_output(f"\n[ERROR] {e}\n")

@@ -89,7 +89,7 @@ class BiomniWorkflow(BaseWorkflow):
 import sys, os
 from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 from biomni.agent import A1
 from biomni.config import default_config
